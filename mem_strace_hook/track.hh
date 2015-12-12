@@ -16,7 +16,9 @@ namespace Track
     unsigned long phnum = 0;
     unsigned long phent = 0;
     struct r_debug *r_debug = NULL; /* map that stores the break point and library name */
-    std::map<std::map<void *, unsigned long>, std::string> map;
+    //std::map< std::string, std::map<void *, unsigned long>> m_break;
+
+
     void get_phdr();
     void get_r_debug_addr();
     int init_tracker();

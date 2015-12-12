@@ -7,6 +7,8 @@
 #include <string>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/wait.h>
+#include <sys/ptrace.h>
 
 namespace Track
 {
@@ -44,46 +46,62 @@ namespace Track
 
   void tracker::get_r_debug_addr()
   {
+    ElfW(Phdr) *ite = phdr;
     struct iovec local[1];
     struct iovec remote[1];
     char buf[512] = { 0 };
     local[0].iov_base = buf;
     local[0].iov_len = sizeof (ElfW(Phdr));
-    for (unsigned i = 0; i < phnum; i++, phdr++)
+
+    for (unsigned i = 0; i < phnum; i++, ite++)
       {
-        remote[0].iov_base = phdr;
+        remote[0].iov_base = ite;
         remote[0].iov_len = sizeof (ElfW(Phdr));
         process_vm_readv(child, local, 1, remote, 1, 0);
         if (reinterpret_cast<ElfW(Phdr) *>(local[0].iov_base)->p_type == PT_DYNAMIC)
           {
-            phdr = reinterpret_cast<ElfW(Phdr) *>(local[0].iov_base);
+            ite = reinterpret_cast<ElfW(Phdr) *>(local[0].iov_base);
             break;
           }
       }
-    if (phdr->p_type != PT_DYNAMIC)
+    if (ite->p_type != PT_DYNAMIC)
       std::cerr << "No dynamic segment found" << std::endl;
-    ElfW(Dyn) *dynamic = reinterpret_cast<ElfW(Dyn) *>(phdr->p_vaddr);
-    struct r_debug *r_dbg = NULL;
-    for (; dynamic->d_tag; dynamic++)
+    ElfW(Addr) pt_dynamic = reinterpret_cast<ElfW(Addr)>(ite->p_vaddr);
+    local[0].iov_len = sizeof (ElfW(Dyn));
+    do
       {
-        remote[0].iov_base = dynamic;
-        remote[0].iov_len = sizeof (ElfW(Dyn));
-        process_vm_readv(child, local, 1, remote, 1, 0);
-        if (reinterpret_cast<ElfW(Dyn) *>(local[0].iov_base)->d_tag == DT_DEBUG)
+        while (true)
           {
-            dynamic = reinterpret_cast<ElfW(Dyn) *>(local[0].iov_base);
-            break;
+            remote[0].iov_base = (void *)pt_dynamic;
+            remote[0].iov_len = sizeof (ElfW(Dyn));
+            process_vm_readv(child, local, 1, remote, 1, 0);
+            if (reinterpret_cast<ElfW(Dyn) *>(local[0].iov_base)->d_tag == DT_DEBUG)
+              {
+                this->r_debug = reinterpret_cast<struct r_debug *>
+                  (reinterpret_cast<ElfW(Dyn) *>(local[0].iov_base)->d_un.d_ptr);
+                break;
+              }
+            if (reinterpret_cast<ElfW(Dyn) *>(local[0].iov_base)->d_tag == DT_NULL)
+              break;
+            pt_dynamic += sizeof (ElfW(Dyn));
           }
+        printf("r_debug = 0x%lx\n", (unsigned long)this->r_debug);
+        if (!r_debug)
+          {
+            ptrace(PTRACE_SINGLESTEP, child, 0, 0);
+            waitpid(child, 0, 0);
+          }
+        else
+          break;
       }
-    r_dbg = reinterpret_cast<struct r_debug *>(dynamic->d_un.d_ptr);
-    this->r_debug = r_dbg;
+    while (true);
   }
 
   int tracker::init_tracker()
   {
     get_phdr();
     if (!phdr || !phnum)
-      return -1;
+      return 1; /* */
     get_r_debug_addr();
     if (!r_debug)
       return -1;
