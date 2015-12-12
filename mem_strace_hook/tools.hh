@@ -7,8 +7,8 @@
 
 namespace Tools
 {
-  ssize_t read_from_pid(pid_t pid, size_t size, char *buff, void *addr);
-  ssize_t write_to_pid(pid_t pid, size_t size, char *buff, void *addr);
+  ssize_t read_from_pid(pid_t pid, size_t size, void *buff, void *addr);
+  ssize_t write_to_pid(pid_t pid, size_t size, void *buff, void *addr);
 }
 
 #endif /* !TOOLS_HH */
