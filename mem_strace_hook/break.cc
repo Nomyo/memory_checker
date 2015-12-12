@@ -4,9 +4,10 @@ Break::Break()
   : mbreak_()
 {}
 
-Break::Break(pid_t pid)
+Break::Break(pid_t pid, int state)
   : mbreak_()
   , pid_(pid)
+  , p_state_(state)
 {}
 
 void Break::set_pid(pid_t pid)
@@ -20,6 +21,21 @@ pid_t Break::get_pid()
 }
 
 Break::~Break() = default;
+
+void Break::set_state(int state)
+{
+  p_state_ = state;
+}
+
+int Break::get_state()
+{
+  return p_state_;
+}
+
+void Break::update(struct link_map *l_map)
+{
+  l_map = l_map;
+}
 
 void Break::add_break(void *addr, char *l_name)
 {
