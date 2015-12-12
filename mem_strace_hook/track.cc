@@ -9,6 +9,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/ptrace.h>
+#include "tools.hh"
 
 namespace Track
 {
@@ -46,13 +47,13 @@ namespace Track
 
   void tracker::get_r_debug_addr()
   {
+    struct r_debug *r_child;
     ElfW(Phdr) *ite = phdr;
     struct iovec local[1];
     struct iovec remote[1];
     char buf[512] = { 0 };
     local[0].iov_base = buf;
     local[0].iov_len = sizeof (ElfW(Phdr));
-
     for (unsigned i = 0; i < phnum; i++, ite++)
       {
         remote[0].iov_base = ite;
@@ -77,7 +78,7 @@ namespace Track
             process_vm_readv(child, local, 1, remote, 1, 0);
             if (reinterpret_cast<ElfW(Dyn) *>(local[0].iov_base)->d_tag == DT_DEBUG)
               {
-                this->r_debug = reinterpret_cast<struct r_debug *>
+                r_child = reinterpret_cast<struct r_debug *>
                   (reinterpret_cast<ElfW(Dyn) *>(local[0].iov_base)->d_un.d_ptr);
                 break;
               }
@@ -85,14 +86,16 @@ namespace Track
               break;
             pt_dynamic += sizeof (ElfW(Dyn));
           }
-        printf("r_debug = 0x%lx\n", (unsigned long)this->r_debug);
-        if (!r_debug)
+        if (r_child == 0)
           {
             ptrace(PTRACE_SINGLESTEP, child, 0, 0);
             waitpid(child, 0, 0);
           }
         else
-          break;
+          {
+            Tools::read_from_pid(child, sizeof (struct r_debug), this->r_debug, r_child);
+            break;
+          }
       }
     while (true);
   }
