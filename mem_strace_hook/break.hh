@@ -13,7 +13,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-
+#include <capstone/capstone.h>
 
 class Break
 {
@@ -23,7 +23,9 @@ public:
   Break(pid_t pid, int state);//, typename r_debug::r_state state);
   ~Break();
 
-  void get_shdr(ElfW(Ehdr) *elf_addr);
+  void update_break(ElfW(Addr) l_addr, ElfW(Off) off,
+                    ElfW(Xword) size, char *l_name);
+  void get_shdr(ElfW(Ehdr) *elf_addr, ElfW(Addr) l_addr);
   void load_lo(struct link_map *l_map);
   void update(struct link_map *l_map);
   void add_break(void *addr, char *l_name);

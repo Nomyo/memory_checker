@@ -32,12 +32,45 @@ int Break::get_state()
   return p_state_;
 }
 
-///////////////////// TEST ///////////////////////////////
+////////////////////////// TEST ///////////////////////////////
 
-void Break::get_shdr(ElfW(Ehdr) *ehdr)
+void Break::update_break(ElfW(Addr) l_addr, ElfW(Off) off,
+                         ElfW(Xword) size, char *l_name)
 {
+  csh handle;
+  cs_insn *insn;
+  size_t count;
+  l_name = l_name;
+  if (cs_open(CS_ARCH_X86, CS_MODE_64, &handle) != CS_ERR_OK)
+    {
+      std::cerr << "Unable to open capstone" << std::endl;
+      return;
+    }
+  char *code = (char *)malloc(sizeof (char) * size);
+  Tools::read_from_pid(pid_, size, code, (void *)((uintptr_t)l_addr + (uintptr_t)off));
+  cs_option(handle, CS_OPT_DETAIL, CS_OPT_OFF);
+  count = cs_disasm(handle,(const uint8_t *)(code), size - 1, l_addr + off, 0, &insn);
+  if (count > 0)
+    {
+      size_t j;
+      for (j = 0; j < count; j++)
+        {
+          printf("0x%lx:     \t%s\t\t%s\n", insn[j].address, insn[j].mnemonic,
+                 insn[j].op_str);
+        }
+      cs_free(insn, count);
+    }
+  else
+    std::cerr << "Couldn't disassemble instruction" << std::endl;
+  free(code);
+  cs_close(&handle);
+}
+
+void Break::get_shdr(ElfW(Ehdr) *ehdr, ElfW(Addr) l_addr)
+{
+  l_addr = l_addr;
   const char * shstrtab;
-  int shnum = ehdr->e_shnum;
+  int shnum = ehdr->e_shnum; /* get number of section */
   if (ehdr->e_shstrndx == SHN_UNDEF)
     {
       std::cerr << "No section header string table index found" << std::endl;
@@ -47,11 +80,18 @@ void Break::get_shdr(ElfW(Ehdr) *ehdr)
   shdr_ad = (ElfW(Shdr) *)((uintptr_t)ehdr + (uintptr_t)ehdr->e_shoff +
                            ((uintptr_t)ehdr->e_shstrndx * (uintptr_t)ehdr->e_shentsize));
   shstrtab = (char *)ehdr + (uintptr_t)shdr_ad->sh_offset;
-  for (int i = 0; i < shnum; i++)
+  for (int i = 0; i < shnum; i++)  /* iterate on each shdr */
     {
       shdr_ad = (ElfW(Shdr) *)((char *)ehdr +
                                (uintptr_t)ehdr->e_shoff + (i * (uintptr_t)ehdr->e_shentsize));
       std::cout << &shstrtab[shdr_ad->sh_name] << std::endl;
+      if (shdr_ad->sh_flags == SHF_EXECINSTR)
+        {
+          /* add breakpoints from l_addr + sh_offset,
+             with process_readv/writev and l_name  sh_size */
+        }
+      printf("SHDR 0x%lx \n", (unsigned long)shdr_ad->sh_offset);
+      printf("SHDR SIZE = %lx \n", (unsigned long)shdr_ad->sh_size);
     }
 }
 
@@ -82,19 +122,20 @@ void Break::load_lo(struct link_map *l_map)
           break;
         }
       elf = (ElfW(Ehdr) *)mmap(0, s.st_size, PROT_READ, MAP_SHARED, file, 0); /* mapp the lib*/
-      get_shdr(elf);
+      struct link_map m;
+      Tools::read_from_pid(pid_, sizeof (struct link_map), &m, l_map);
+      printf("L_ADDR = 0x%lx\n ",  m.l_addr);
+      get_shdr(elf, m.l_addr);
       munmap(elf, s.st_size);
       l_map = Tools::get_load_obj_next(pid_, l_map);
     }
 }
-
 
 ////////////////////////////////////////////////////////////////
 
 void Break::update(struct link_map *l_map)
 {
   l_map = l_map;
-
   if (p_state_ == r_debug::RT_ADD)
     load_lo(l_map);
   else if (p_state_ == r_debug::RT_DELETE)
