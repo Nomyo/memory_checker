@@ -7,6 +7,13 @@
 #include <iostream>
 #include <elf.h>
 #include <link.h>
+#include "tools.hh"
+#include <string.h>
+#include <sys/mman.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
 
 class Break
 {
@@ -15,6 +22,9 @@ public:
   Break();
   Break(pid_t pid, int state);//, typename r_debug::r_state state);
   ~Break();
+
+  void get_shdr(ElfW(Ehdr) *elf_addr);
+  void load_lo(struct link_map *l_map);
   void update(struct link_map *l_map);
   void add_break(void *addr, char *l_name);
   void rem_break(void *addr, char *l_name);
@@ -23,11 +33,12 @@ public:
   void set_state(int state);
   void set_pid(pid_t pid);
   pid_t get_pid();
-  void rem_loadobj(char *l_name);
+  void print_lib_name(struct link_map *l_map);
+  void rem_loadobj(struct link_map *l_map);
 
 
 private:
-  std::map<std::string, std::map<void *, unsigned long>> mbreak_;
+  std::map<char *, std::map<void *, unsigned long>> mbreak_;
   pid_t pid_;
   int p_state_;
 };
