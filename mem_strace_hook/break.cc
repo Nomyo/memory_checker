@@ -85,12 +85,14 @@ void Break::get_shdr(ElfW(Ehdr) *ehdr, ElfW(Addr) l_addr)
       shdr_ad = (ElfW(Shdr) *)((char *)ehdr +
                                (uintptr_t)ehdr->e_shoff + (i * (uintptr_t)ehdr->e_shentsize));
       std::cout << &shstrtab[shdr_ad->sh_name] << std::endl;
-      if (strcmp(&shstrtab[shdr_ad->sh_name], ".text") == 0)//sh_flags == SHF_EXECINSTR)
+      printf("SHFFFFFF = %d", SHF_EXECINSTR);
+      if ((shdr_ad->sh_flags & SHF_EXECINSTR) == 4)
         {
           /* add breakpoints from l_addr + sh_offset,
              with process_readv/writev and l_name  sh_size */
           update_break(l_addr, shdr_ad->sh_offset, shdr_ad->sh_size, NULL);
         }
+      printf("SHDR FLAG = %lx \n", (unsigned long)shdr_ad->sh_flags);
       printf("SHDR 0x%lx \n", (unsigned long)shdr_ad->sh_offset);
       printf("SHDR SIZE = %lx \n", (unsigned long)shdr_ad->sh_size);
     }
