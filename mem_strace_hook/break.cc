@@ -33,15 +33,28 @@ int Break::get_state()
 }
 
 
-
-///////////////////// TESTTTTTT ///////////////////////////////
-
+///////////////////// TEST ///////////////////////////////
 
 
-void Break::get_shdr(ElfW(Ehdr) *elf_addr)
+void Break::get_shdr(ElfW(Ehdr) *ehdr)
 {
-  int shnum =
-
+  const char * shstrtab;
+  int shnum = ehdr->e_shnum;
+  if (ehdr->e_shstrndx == SHN_UNDEF)
+    {
+      std::cerr << "No section header string table index found" << std::endl;
+      return;
+    }
+  ElfW(Shdr) *shdr_ad;
+  shdr_ad = (ElfW(Shdr) *)((uintptr_t)ehdr + (uintptr_t)ehdr->e_shoff +
+                           ((uintptr_t)ehdr->e_shstrndx * (uintptr_t)ehdr->e_shentsize));
+  shstrtab = (char *)ehdr + (uintptr_t)shdr_ad->sh_offset;
+  for (int i = 0; i < shnum; i++)
+    {
+      shdr_ad = (ElfW(Shdr) *)((char *)ehdr +
+                               (uintptr_t)ehdr->e_shoff + (i * (uintptr_t)ehdr->e_shentsize));
+      std::cout << &shstrtab[shdr_ad->sh_name] << std::endl;
+    }
 }
 
 void Break::load_lo(struct link_map *l_map)
@@ -52,7 +65,12 @@ void Break::load_lo(struct link_map *l_map)
   while (l_map)
     {
       Tools::get_load_obj_name(pid_, l_map, name);
-      printf("Lib name :%s \n", name);
+      if (strcmp("", name) == 0)
+        {
+          l_map = Tools::get_load_obj_next(pid_, l_map);
+          continue;
+        }
+      printf("\nIN Lib name :%s ", name);
       int file = open(name, O_RDONLY);
       if (file == -1)
         {
@@ -80,10 +98,7 @@ void Break::update(struct link_map *l_map)
   l_map = l_map;
 
   if (p_state_ == r_debug::RT_ADD)
-    {
-      load_lo(l_map);
-      //      print_lib_name(l_map); /* should add all new load object */
-    }
+    load_lo(l_map);
   else if (p_state_ == r_debug::RT_DELETE)
     rem_loadobj(l_map);
 }

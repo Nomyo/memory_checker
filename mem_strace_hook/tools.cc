@@ -25,4 +25,18 @@ namespace Tools
     return process_vm_writev(pid, local, 1, remote, 1, 0);
   }
 
+  ssize_t get_load_obj_name(pid_t pid, struct link_map *l_map, char *name)
+  {
+    struct link_map in_child;
+    read_from_pid(pid, sizeof (struct link_map), &in_child, l_map);
+    return read_from_pid(pid, sizeof (char) * 512, name, in_child.l_name);
+  }
+
+  struct link_map *get_load_obj_next(pid_t pid, struct link_map *l_map)
+  {
+    struct link_map in_child;
+    read_from_pid(pid, sizeof (struct link_map), &in_child, l_map);
+    l_map = in_child.l_next;
+    return l_map;
+  }
 }
