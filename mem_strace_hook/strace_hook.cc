@@ -52,7 +52,7 @@ int main(int argc, char *argv[])
   Break l_break(child, tr.r_debug->r_state);
   set_break((void *)tr.r_debug->r_brk, tr.child);
 
-  /* should set breakpoints on our own .init .text */
+  /* should set breakpoints in our own .init .text */
 
   struct user_regs_struct regs;
   while (true)
@@ -61,7 +61,11 @@ int main(int argc, char *argv[])
       waitpid(child, &status, 0);
       std::cout << "STATUS = " << status << std::endl;
       if (WIFEXITED(status))
-        return 1;
+        {
+          free(tr.r_debug);
+          return 0;
+        }
+      tr.get_r_debug_addr(); /* update r_debug */
       if (WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP) /* Program breaks */
         {
           ptrace(PTRACE_GETREGS, child, NULL, &regs);
@@ -76,7 +80,6 @@ int main(int argc, char *argv[])
           else
             std::cout << "treat break and put the syscall back\n"; //l_break.rem_break(regs.rip, );
         }
-      tr.get_r_debug_addr(); /* update r_debug */
     }
   /* FREE tr.r_debug */
   return 0;
