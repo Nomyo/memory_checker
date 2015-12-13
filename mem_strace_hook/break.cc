@@ -32,9 +32,60 @@ int Break::get_state()
   return p_state_;
 }
 
+
+
+///////////////////// TESTTTTTT ///////////////////////////////
+
+
+
+void Break::get_shdr(ElfW(Ehdr) *elf_addr)
+{
+  int shnum =
+
+}
+
+void Break::load_lo(struct link_map *l_map)
+{
+  char name[512];
+  ElfW(Ehdr) *elf;
+  l_map = Tools::get_load_obj_next(pid_, l_map); // Bypass first l_map
+  while (l_map)
+    {
+      Tools::get_load_obj_name(pid_, l_map, name);
+      printf("Lib name :%s \n", name);
+      int file = open(name, O_RDONLY);
+      if (file == -1)
+        {
+          std::cerr << "Couldn't open " << name << " file" << std::endl;
+          break;
+        }
+      struct stat s;
+      if (fstat(file, &s) == -1)
+        {
+          std::cerr << "Couldn't open " << name << " file" << std::endl;
+          break;
+        }
+      elf = (ElfW(Ehdr) *)mmap(0, s.st_size, PROT_READ, MAP_SHARED, file, 0); /* mapp the lib*/
+      get_shdr(elf);
+      munmap(elf, s.st_size);
+      l_map = Tools::get_load_obj_next(pid_, l_map);
+    }
+}
+
+
+////////////////////////////////////////////////////////////////
+
 void Break::update(struct link_map *l_map)
 {
   l_map = l_map;
+
+  if (p_state_ == r_debug::RT_ADD)
+    {
+      load_lo(l_map);
+      //      print_lib_name(l_map); /* should add all new load object */
+    }
+  else if (p_state_ == r_debug::RT_DELETE)
+    rem_loadobj(l_map);
 }
 
 void Break::add_break(void *addr, char *l_name)
@@ -60,9 +111,27 @@ void Break::add_break(void *addr, char *l_name)
     }
 }
 
-void Break::rem_loadobj(char *l_name)
+void Break::rem_loadobj(struct link_map *l_map)
 {
-  mbreak_.erase(l_name);
+  struct link_map *head = l_map;
+  char name[512];
+  for (auto const &i : mbreak_)
+    {
+      while (l_map)
+        {
+          Tools::get_load_obj_name(pid_, l_map, name);
+          if (strcmp(name, i.first) == 0)
+            break;
+          Tools::get_load_obj_next(pid_, l_map);
+        }
+      if (!l_map)
+        {
+          mbreak_.erase(i.first);
+          break;
+        }
+      else
+        l_map = head;
+    }
 }
 
 void Break::rem_break(void *addr, char *l_name)
@@ -72,6 +141,18 @@ void Break::rem_break(void *addr, char *l_name)
   unsigned ins = mbreak_[l_name][addr];
   mbreak_[l_name].erase(addr);
   ptrace(PTRACE_POKEDATA, addr, ins); /* replace rip ? */
+}
+
+void Break::print_lib_name(struct link_map *l_map)
+{
+  char name[512];
+  l_map = Tools::get_load_obj_next(pid_, l_map);
+  while (l_map)
+    {
+      Tools::get_load_obj_name(pid_, l_map, name);
+      printf("Lib name :%s \n", name);
+      l_map = Tools::get_load_obj_next(pid_, l_map);
+    }
 }
 
 void Break::print_breaks()
