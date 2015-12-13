@@ -85,10 +85,11 @@ void Break::get_shdr(ElfW(Ehdr) *ehdr, ElfW(Addr) l_addr)
       shdr_ad = (ElfW(Shdr) *)((char *)ehdr +
                                (uintptr_t)ehdr->e_shoff + (i * (uintptr_t)ehdr->e_shentsize));
       std::cout << &shstrtab[shdr_ad->sh_name] << std::endl;
-      if (shdr_ad->sh_flags == SHF_EXECINSTR)
+      if (strcmp(&shstrtab[shdr_ad->sh_name], ".text") == 0)//sh_flags == SHF_EXECINSTR)
         {
           /* add breakpoints from l_addr + sh_offset,
              with process_readv/writev and l_name  sh_size */
+          update_break(l_addr, shdr_ad->sh_offset, shdr_ad->sh_size, NULL);
         }
       printf("SHDR 0x%lx \n", (unsigned long)shdr_ad->sh_offset);
       printf("SHDR SIZE = %lx \n", (unsigned long)shdr_ad->sh_size);
@@ -99,11 +100,11 @@ void Break::load_lo(struct link_map *l_map)
 {
   char name[512];
   ElfW(Ehdr) *elf;
-  //  l_map = Tools::get_load_obj_next(pid_, l_map); // Bypass first l_map
+  l_map = Tools::get_load_obj_next(pid_, l_map); // Bypass first l_map
   while (l_map)
     {
       Tools::get_load_obj_name(pid_, l_map, name);
-      if (strcmp("", name) == 0)
+      if (strcmp("", name) == 0 || strcmp("linux-vdso.so.1", name) == 0)
         {
           l_map = Tools::get_load_obj_next(pid_, l_map);
           continue;
