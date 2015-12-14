@@ -31,15 +31,14 @@ int Break::get_state()
 {
   return p_state_;
 }
-
 ////////////////////////// TEST ///////////////////////////////
 
 void Break::update_break(ElfW(Addr) l_addr, ElfW(Off) off,
                          ElfW(Xword) size, char *l_name)
 {
   csh handle;
-  cs_insn *insn;
-  size_t count;
+  cs_insn *insn = NULL;
+  size_t count = 0;
   l_name = l_name;
   if (cs_open(CS_ARCH_X86, CS_MODE_64, &handle) != CS_ERR_OK)
     {
@@ -49,7 +48,7 @@ void Break::update_break(ElfW(Addr) l_addr, ElfW(Off) off,
   char *code = (char *)malloc(sizeof (char) * size);
   Tools::read_from_pid(pid_, size, code, (void *)((uintptr_t)l_addr + (uintptr_t)off));
   cs_option(handle, CS_OPT_DETAIL, CS_OPT_OFF);
-  count = cs_disasm(handle,(const uint8_t *)(code), size - 1, l_addr + off, 0, &insn);
+  count = cs_disasm(handle, (const uint8_t *)(code), size - 1, l_addr + off, 0, &insn);
   if (count > 0)
     {
       size_t j;
@@ -57,9 +56,9 @@ void Break::update_break(ElfW(Addr) l_addr, ElfW(Off) off,
         {
           if (strcmp(insn[j].mnemonic, "syscall") == 0)
             {
-              printf("0x%lx:     \t%s\t\t%s\n", insn[j].address, insn[j].mnemonic,
-                     insn[j].op_str);
-              add_break((void *)insn[j].address, l_name);
+              //              printf("0x%lx:     \t%s\t\t%s\n", insn[j].address, insn[j].mnemonic,
+              //        insn[j].op_str);
+              add_break((uintptr_t)insn[j].address, std::string(l_name));
             }
         }
       cs_free(insn, count);
@@ -72,7 +71,7 @@ void Break::update_break(ElfW(Addr) l_addr, ElfW(Off) off,
 
 void Break::get_shdr(ElfW(Ehdr) *ehdr, ElfW(Addr) l_addr, char *l_name)
 {
-  const char * shstrtab;
+  //  const char * shstrtab;
   int shnum = ehdr->e_shnum; /* get number of section */
   if (ehdr->e_shstrndx == SHN_UNDEF)
     {
@@ -82,12 +81,12 @@ void Break::get_shdr(ElfW(Ehdr) *ehdr, ElfW(Addr) l_addr, char *l_name)
   ElfW(Shdr) *shdr_ad;
   shdr_ad = (ElfW(Shdr) *)((uintptr_t)ehdr + (uintptr_t)ehdr->e_shoff +
                            ((uintptr_t)ehdr->e_shstrndx * (uintptr_t)ehdr->e_shentsize));
-  shstrtab = (char *)ehdr + (uintptr_t)shdr_ad->sh_offset;
+  // shstrtab = (char *)ehdr + (uintptr_t)shdr_ad->sh_offset;
   for (int i = 0; i < shnum; i++)  /* iterate on each shdr */
     {
       shdr_ad = (ElfW(Shdr) *)((char *)ehdr +
                                (uintptr_t)ehdr->e_shoff + (i * (uintptr_t)ehdr->e_shentsize));
-      std::cout << &shstrtab[shdr_ad->sh_name] << std::endl;
+      //      std::cout << &shstrtab[shdr_ad->sh_name] << std::endl;
       if ((shdr_ad->sh_flags & SHF_EXECINSTR) == 4)
         {
           /* add breakpoints from l_addr + sh_offset,
@@ -113,7 +112,7 @@ void Break::load_lo(struct link_map *l_map)
           l_map = Tools::get_load_obj_next(pid_, l_map);
           continue;
         }
-      printf("\nIN Lib name :%s ", name);
+      //      printf("\nIN Lib name :%s ", name);
       int file = open(name, O_RDONLY);
       if (file == -1)
         {
@@ -129,7 +128,7 @@ void Break::load_lo(struct link_map *l_map)
       elf = (ElfW(Ehdr) *)mmap(0, s.st_size, PROT_READ, MAP_SHARED, file, 0); /* mapp the lib*/
       struct link_map m;
       Tools::read_from_pid(pid_, sizeof (struct link_map), &m, l_map);
-      get_shdr(elf, m.l_addr, m.l_name);
+      get_shdr(elf, m.l_addr, name);
       munmap(elf, s.st_size);
       l_map = Tools::get_load_obj_next(pid_, l_map);
     }
@@ -146,14 +145,19 @@ void Break::update(struct link_map *l_map)
     rem_loadobj(l_map);
 }
 
-void Break::add_break(void *addr, char *l_name)
+void Break::add_break(uintptr_t addr, std::string l_name)
 {
   if (mbreak_.find(l_name) == mbreak_.end()) /* unpatch loaded objects*/
     {
-      mbreak_.insert(pair_name_map(l_name, std::map<void *, unsigned long>{}));
+      mbreak_.insert(pair_name_map(l_name, std::map<uintptr_t, unsigned long>{}));
       unsigned long ins = ptrace(PTRACE_PEEKDATA, pid_, addr); /* get instruction */
-      mbreak_[l_name].insert(std::pair<void *, unsigned long>(addr, ins)); /* store old ins */
-      ptrace(PTRACE_POKEDATA, addr, (ins & 0xffffffffffffff00) | 0xcc); /* insert break point*/
+      //printf("instruction PRE %lx\n", ins);
+      mbreak_[l_name].insert(std::pair<uintptr_t, unsigned long>(addr, ins)); /* store old ins */
+      ptrace(PTRACE_POKEDATA, pid_, addr, (ins & 0xffffffffffffff00) | 0xcc); /* insert break point*/
+      //unsigned long ins2 = ptrace(PTRACE_PEEKDATA, pid_, addr);
+      //  printf("instruction POST %lx\n", ins2);
+      printf("BRK AT 0x%lx with %ld\n", (unsigned long)addr, ins);
+      
     }
   else
     {
@@ -161,10 +165,14 @@ void Break::add_break(void *addr, char *l_name)
         return;
       else
         {
-          mbreak_.insert(pair_name_map(l_name, std::map<void *, unsigned long>{}));
+          mbreak_.insert(pair_name_map(l_name, std::map<uintptr_t, unsigned long>{}));
           unsigned long ins = ptrace(PTRACE_PEEKDATA, pid_, addr);
-          mbreak_[l_name].insert(std::pair<void *, unsigned long>(addr, ins));
-          ptrace(PTRACE_POKEDATA, addr, (ins & 0xffffffffffffff00) | 0xcc);
+          printf("BRK AT 0x%lx with %lx \n", (unsigned long)addr, ins);
+          //          printf("instruction PRE %lx\n", ins);
+          mbreak_[l_name].insert(std::pair<uintptr_t, unsigned long>(addr, ins));
+          ptrace(PTRACE_POKEDATA, pid_, addr, (ins & 0xffffffffffffff00) | 0xcc);
+          //unsigned long ins2 = ptrace(PTRACE_PEEKDATA, pid_, addr);
+          // printf("instruction POST %lx\n", ins2);
         }
     }
 }
@@ -178,7 +186,7 @@ void Break::rem_loadobj(struct link_map *l_map)
       while (l_map)
         {
           Tools::get_load_obj_name(pid_, l_map, name);
-          if (strcmp(name, i.first) == 0)
+          if (i.first.compare(name) == 0)
             break;
           Tools::get_load_obj_next(pid_, l_map);
         }
@@ -192,13 +200,51 @@ void Break::rem_loadobj(struct link_map *l_map)
     }
 }
 
-void Break::rem_break(void *addr, char *l_name)
+void Break::treat_break(struct link_map *l_map, uintptr_t addr)
 {
+  char name[512];
+  l_map = Tools::get_load_obj_next(pid_, l_map); // Bypass first l_map
+  while (l_map)
+    {
+      Tools::get_load_obj_name(pid_, l_map, name);
+      rem_break(addr, name);
+      l_map = Tools::get_load_obj_next(pid_, l_map);
+    }  
+}
+
+void Break::rem_break(uintptr_t addr, char *l_name)
+{
+  for (auto const &i : mbreak_)
+    {
+      if (i.first.compare(l_name) == 0)
+        {
+          if (i.second.find(addr) != i.second.end())
+            {
+              for (auto const &j : i.second)
+                {
+                  if (j.first == addr)
+                    {
+                      printf("\t FOUND 0x%lx with %ld\n", (unsigned long)j.first, j.second);      
+                      unsigned long ins = j.second;
+                      unsigned long inspre = ptrace(PTRACE_PEEKDATA, pid_, addr);
+                      printf("instruction PRE %lx\n", inspre);
+                      mbreak_[i.first].erase(addr);
+                      ptrace(PTRACE_POKEDATA, pid_, addr, ins);
+                      unsigned long inspost = ptrace(PTRACE_PEEKDATA, pid_, addr);
+                      printf("instruction POST %lx\n", inspost);
+                      return;
+                    }
+
+                  
+                }
+            }
+        }
+    }/*
   if (mbreak_[l_name].find(addr) != mbreak_[l_name].end())
     return;
   unsigned ins = mbreak_[l_name][addr];
   mbreak_[l_name].erase(addr);
-  ptrace(PTRACE_POKEDATA, addr, ins); /* replace rip ? */
+  ptrace(PTRACE_POKEDATA, addr, ins);  replace rip ? */
 }
 
 void Break::print_lib_name(struct link_map *l_map)

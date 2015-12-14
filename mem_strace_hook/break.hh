@@ -18,7 +18,7 @@
 class Break
 {
 public:
-  using pair_name_map = std::pair<char *, std::map<void *, unsigned long>>;
+  using pair_name_map = std::pair<std::string, std::map<uintptr_t, unsigned long>>;
   Break();
   Break(pid_t pid, int state);//, typename r_debug::r_state state);
   ~Break();
@@ -28,8 +28,9 @@ public:
   void get_shdr(ElfW(Ehdr) *elf_addr, ElfW(Addr) l_addr, char *name);
   void load_lo(struct link_map *l_map);
   void update(struct link_map *l_map);
-  void add_break(void *addr, char *l_name);
-  void rem_break(void *addr, char *l_name);
+  void treat_break(struct link_map *l_map, uintptr_t addr);
+  void add_break(uintptr_t addr, std::string l_name);
+  void rem_break(uintptr_t addr, char *l_name);
   void print_breaks();
   int get_state();
   void set_state(int state);
@@ -38,9 +39,9 @@ public:
   void print_lib_name(struct link_map *l_map);
   void rem_loadobj(struct link_map *l_map);
 
-
+  
 private:
-  std::map<char *, std::map<void *, unsigned long>> mbreak_;
+  std::map<std::string, std::map<uintptr_t, unsigned long>> mbreak_;
   pid_t pid_;
   int p_state_;
 };
