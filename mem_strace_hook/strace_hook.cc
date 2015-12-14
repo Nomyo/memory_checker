@@ -62,6 +62,7 @@ int main(int argc, char *argv[])
       std::cout << "STATUS = " << status << std::endl;
       if (WIFEXITED(status))
         {
+          l_break.print_breaks();
           free(tr.r_debug);
           return 0;
         }

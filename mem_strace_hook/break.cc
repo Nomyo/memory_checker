@@ -55,8 +55,12 @@ void Break::update_break(ElfW(Addr) l_addr, ElfW(Off) off,
       size_t j;
       for (j = 0; j < count; j++)
         {
-          printf("0x%lx:     \t%s\t\t%s\n", insn[j].address, insn[j].mnemonic,
-                 insn[j].op_str);
+          if (strcmp(insn[j].mnemonic, "syscall") == 0)
+            {
+              printf("0x%lx:     \t%s\t\t%s\n", insn[j].address, insn[j].mnemonic,
+                     insn[j].op_str);
+              add_break((void *)insn[j].address, l_name);
+            }
         }
       cs_free(insn, count);
     }
@@ -66,9 +70,8 @@ void Break::update_break(ElfW(Addr) l_addr, ElfW(Off) off,
   cs_close(&handle);
 }
 
-void Break::get_shdr(ElfW(Ehdr) *ehdr, ElfW(Addr) l_addr)
+void Break::get_shdr(ElfW(Ehdr) *ehdr, ElfW(Addr) l_addr, char *l_name)
 {
-  l_addr = l_addr;
   const char * shstrtab;
   int shnum = ehdr->e_shnum; /* get number of section */
   if (ehdr->e_shstrndx == SHN_UNDEF)
@@ -85,16 +88,15 @@ void Break::get_shdr(ElfW(Ehdr) *ehdr, ElfW(Addr) l_addr)
       shdr_ad = (ElfW(Shdr) *)((char *)ehdr +
                                (uintptr_t)ehdr->e_shoff + (i * (uintptr_t)ehdr->e_shentsize));
       std::cout << &shstrtab[shdr_ad->sh_name] << std::endl;
-      printf("SHFFFFFF = %d", SHF_EXECINSTR);
       if ((shdr_ad->sh_flags & SHF_EXECINSTR) == 4)
         {
           /* add breakpoints from l_addr + sh_offset,
              with process_readv/writev and l_name  sh_size */
-          update_break(l_addr, shdr_ad->sh_offset, shdr_ad->sh_size, NULL);
+          update_break(l_addr, shdr_ad->sh_offset, shdr_ad->sh_size, l_name);
         }
-      printf("SHDR FLAG = %lx \n", (unsigned long)shdr_ad->sh_flags);
-      printf("SHDR 0x%lx \n", (unsigned long)shdr_ad->sh_offset);
-      printf("SHDR SIZE = %lx \n", (unsigned long)shdr_ad->sh_size);
+      //printf("SHDR FLAG = %lx \n", (unsigned long)shdr_ad->sh_flags);
+      //printf("SHDR 0x%lx \n", (unsigned long)shdr_ad->sh_offset);
+      //printf("SHDR SIZE = %lx \n", (unsigned long)shdr_ad->sh_size);
     }
 }
 
@@ -127,8 +129,7 @@ void Break::load_lo(struct link_map *l_map)
       elf = (ElfW(Ehdr) *)mmap(0, s.st_size, PROT_READ, MAP_SHARED, file, 0); /* mapp the lib*/
       struct link_map m;
       Tools::read_from_pid(pid_, sizeof (struct link_map), &m, l_map);
-      printf("L_ADDR = 0x%lx\n ",  m.l_addr);
-      get_shdr(elf, m.l_addr);
+      get_shdr(elf, m.l_addr, m.l_name);
       munmap(elf, s.st_size);
       l_map = Tools::get_load_obj_next(pid_, l_map);
     }
