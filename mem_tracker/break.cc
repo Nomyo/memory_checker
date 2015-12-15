@@ -1,40 +1,40 @@
-#include "break.hh"
-#include <errno.h>
+#include "track.hh"
 
-Break::Break()
+Tracker::Tracker()
   : mbreak_()
 {}
 
-Break::Break(pid_t pid, int state, char *name)
+Tracker::Tracker(pid_t pid, int state, char *name)
   : mbreak_()
   , pid_(pid)
   , p_state_(state)
   , binary_(name)
+  , ls_mem_()
 {}
 
-void Break::set_pid(pid_t pid)
+void Tracker::set_pid(pid_t pid)
 {
   pid_ = pid;
 }
 
-pid_t Break::get_pid()
+pid_t Tracker::get_pid()
 {
   return pid_;
 }
 
-Break::~Break() = default;
+Tracker::~Tracker() = default;
 
-void Break::set_state(int state)
+void Tracker::set_state(int state)
 {
   p_state_ = state;
 }
 
-int Break::get_state()
+int Tracker::get_state()
 {
   return p_state_;
 }
 
-void Break::update_break(ElfW(Addr) l_addr, ElfW(Off) off,
+void Tracker::update_break(ElfW(Addr) l_addr, ElfW(Off) off,
                          ElfW(Xword) size, char *l_name)
 {
   csh handle;
@@ -65,7 +65,7 @@ void Break::update_break(ElfW(Addr) l_addr, ElfW(Off) off,
   cs_close(&handle);
 }
 
-void Break::get_shdr(ElfW(Ehdr) *ehdr, ElfW(Addr) l_addr, char *l_name)
+void Tracker::get_shdr(ElfW(Ehdr) *ehdr, ElfW(Addr) l_addr, char *l_name)
 {
   int shnum = ehdr->e_shnum; /* get number of section */
   if (ehdr->e_shstrndx == SHN_UNDEF)
@@ -85,7 +85,7 @@ void Break::get_shdr(ElfW(Ehdr) *ehdr, ElfW(Addr) l_addr, char *l_name)
   }
 }
 
-void Break::init_break() /* add break of elf child file*/
+void Tracker::init_break() /* add break of elf child file*/
 {
   ElfW(Ehdr) *elf;
   ElfW(Addr) addr = 0x400000;
@@ -106,7 +106,7 @@ void Break::init_break() /* add break of elf child file*/
   munmap(elf, s.st_size);
 }
 
-void Break::load_lo(struct link_map *l_map)
+void Tracker::load_lo(struct link_map *l_map)
 {
   char name[512];
   ElfW(Ehdr) *elf;
@@ -143,7 +143,7 @@ void Break::load_lo(struct link_map *l_map)
   }
 }
 
-void Break::update(struct link_map *l_map)
+void Tracker::update(struct link_map *l_map)
 {
   if (p_state_ == r_debug::RT_ADD)
     load_lo(l_map);
@@ -151,7 +151,7 @@ void Break::update(struct link_map *l_map)
     rem_loadobj(l_map);
 }
 
-void Break::add_break(uintptr_t addr, std::string l_name)
+void Tracker::add_break(uintptr_t addr, std::string l_name)
 {
   if (mbreak_.find(l_name) == mbreak_.end()) /* unpatch loaded objects*/
   {
@@ -174,7 +174,7 @@ void Break::add_break(uintptr_t addr, std::string l_name)
   }
 }
 
-void Break::rem_loadobj(struct link_map *l_map)
+void Tracker::rem_loadobj(struct link_map *l_map)
 {
   struct link_map *head = l_map;
   char name[512];
@@ -197,7 +197,7 @@ void Break::rem_loadobj(struct link_map *l_map)
   }
 }
 
-int Break::treat_break(struct link_map *l_map, uintptr_t addr,
+int Tracker::treat_break(struct link_map *l_map, uintptr_t addr,
                        struct user_regs_struct regs)
 {
   char name[512];
@@ -212,40 +212,43 @@ int Break::treat_break(struct link_map *l_map, uintptr_t addr,
   return 0;
 }
 
-int Break::rem_break(uintptr_t addr, char *l_name, struct user_regs_struct regs)
+int Tracker::rem_break(uintptr_t addr, char *l_name, struct user_regs_struct regs)
 {
   for (auto const &i : mbreak_)
   {
-    if (i.first.compare(l_name) == 0)
+    if (i.first.compare(l_name) == 0
+        && (i.second.find(addr) != i.second.end()))
     {
-      if (i.second.find(addr) != i.second.end())
+      for (auto const &j : i.second)
       {
-        for (auto const &j : i.second)
+        if (j.first == addr)
         {
-          if (j.first == addr)
+          int status;
+          unsigned long ins = j.second;
+          ptrace(PTRACE_POKEDATA, pid_, addr, ins);
+          regs.rip--;
+          ptrace(PTRACE_SETREGS, pid_, NULL, &regs);
+          ptrace(PTRACE_SINGLESTEP, pid_, 0, 0);
+          waitpid(pid_, &status, 0);
+          if (WIFEXITED(status))
           {
-            int status;
-            unsigned long ins = j.second;
-            ptrace(PTRACE_POKEDATA, pid_, addr, ins);
-            regs.rip--;
-            ptrace(PTRACE_SETREGS, pid_, NULL, &regs);
-            ptrace(PTRACE_SINGLESTEP, pid_, 0, 0);
-            waitpid(pid_, &status, 0);
-            if (WIFEXITED(status))
-            {
-              ptrace(PTRACE_GETREGS, pid_, NULL, &regs);
-              p_sys_exit(regs.rax, WEXITSTATUS(status), pid_);
-              printf("++++++ exited with %d ++++++\n", WEXITSTATUS(status));
-              return 1;
-            }
-            else
-            {
-              ptrace(PTRACE_GETREGS, pid_, NULL, &regs);
-              p_syscall(regs.orig_rax, regs, pid_);
-            }
-            ptrace(PTRACE_POKEDATA, pid_, addr,
-                   (ins & 0xffffffffffffff00) | 0xcc);
+            ptrace(PTRACE_GETREGS, pid_, NULL, &regs);
+            p_sys_exit(regs.rax, WEXITSTATUS(status), pid_);
+            print_ls_mem();
+            printf("++++++ exited with %d ++++++\n", WEXITSTATUS(status));
+            return 1;
           }
+          else
+          {
+            ptrace(PTRACE_GETREGS, pid_, NULL, &regs);
+            if (regs.orig_rax == __NR_mmap || regs.orig_rax == __NR_mremap
+              || regs.orig_rax == __NR_munmap || regs.orig_rax == __NR_mprotect
+              || regs.orig_rax == __NR_brk)
+              wrap_alloc_syscall(regs.orig_rax, regs);              
+            //p_syscall(regs.orig_rax, regs, pid_);
+          }
+          ptrace(PTRACE_POKEDATA, pid_, addr,
+                 (ins & 0xffffffffffffff00) | 0xcc);
         }
       }
     }
@@ -253,7 +256,7 @@ int Break::rem_break(uintptr_t addr, char *l_name, struct user_regs_struct regs)
   return 0;
 }
 
-void Break::print_lib_name(struct link_map *l_map)
+void Tracker::print_lib_name(struct link_map *l_map)
 {
   char name[512];
   l_map = Tools::get_load_obj_next(pid_, l_map);
@@ -265,7 +268,7 @@ void Break::print_lib_name(struct link_map *l_map)
   }
 }
 
-void Break::print_breaks()
+void Tracker::print_breaks()
 {
   for (auto const &i : mbreak_)
   {
