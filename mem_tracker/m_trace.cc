@@ -9,7 +9,7 @@ void Tracker::wrap_mmap(struct user_regs_struct regs)
   s.prot = regs.rdx;
   ls_mem_.push_back(s);
   printf("[pid %d] mmap { addr = 0x%llx, len = 0x%llx, prot = %lld }\n",
-         pid_, regs.rax, regs.rsi, regs.rdx);  
+         pid_, regs.rax, regs.rsi, regs.rdx);
 }
 
 void Tracker::wrap_munmap(struct user_regs_struct regs)
@@ -91,9 +91,32 @@ void Tracker::print_ls_mem()
   {
     printf("MAP AT :%lx with len 0x%lx, and prot = %ld\n", i.addr, i.len, i.prot);
   }
-
 }
 
+void Tracker::wrap_brk(struct user_regs_struct regs)
+{
+  if (brk_ == 0)
+    brk_ = (uintptr_t)regs.rax;
+  else
+  {
+    if (brk_len_)
+    {
+      printf("[pid %d] brk { addr = 0x%lx, len = 0x%lx, prot = 0 }\n",
+             pid_, brk_, brk_len_);
+      brk_len_ = brk_len_ + regs.rdi - brk_; 
+      printf("\tto { addr = 0x%lx, len = 0x%lx, prot = 0 }\n",
+             brk_, brk_len_);
+    }
+    else
+    {
+      printf("[pid %d] brk { addr = 0x%lx, len = (nil), prot = 0 }\n",
+              pid_, brk_);
+      brk_len_ = brk_len_ + regs.rdi - brk_; 
+      printf("\tto { addr = 0x%lx, len = 0x%lx, prot = 0 }\n",
+             brk_, brk_len_);
+    }
+  }
+}
 
 
 void Tracker::wrap_alloc_syscall(unsigned long sysnum,
@@ -104,5 +127,7 @@ void Tracker::wrap_alloc_syscall(unsigned long sysnum,
   else if (sysnum == __NR_munmap)
     wrap_munmap(regs);
   else if (sysnum == __NR_mremap)
-    wrap_mremap(regs); 
+    wrap_mremap(regs);
+  else if (sysnum == __NR_brk)
+    wrap_brk(regs);
 }

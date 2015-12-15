@@ -245,7 +245,6 @@ int Tracker::rem_break(uintptr_t addr, char *l_name, struct user_regs_struct reg
               || regs.orig_rax == __NR_munmap || regs.orig_rax == __NR_mprotect
               || regs.orig_rax == __NR_brk)
               wrap_alloc_syscall(regs.orig_rax, regs);              
-            //p_syscall(regs.orig_rax, regs, pid_);
           }
           ptrace(PTRACE_POKEDATA, pid_, addr,
                  (ins & 0xffffffffffffff00) | 0xcc);

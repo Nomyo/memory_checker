@@ -49,8 +49,8 @@ public:
   void wrap_munmap(struct user_regs_struct regs);
   void wrap_mremap(struct user_regs_struct regs);
   void wrap_alloc_syscall(unsigned long sysnum, struct user_regs_struct regs);
+  void wrap_brk(struct user_regs_struct regs);
   void print_ls_mem();
-
 
 private:
   std::map<std::string, std::map<uintptr_t, unsigned long>> mbreak_;
@@ -58,7 +58,8 @@ private:
   int p_state_;
   char *binary_;
   std::list<S_mem> ls_mem_;
-  
+  uintptr_t brk_ = 0;
+  unsigned long brk_len_ = 0;
 };
 
 #endif /* !BREAK_HH */
