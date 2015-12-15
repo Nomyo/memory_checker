@@ -106,30 +106,6 @@ void Break::init_break() /* add break of elf child file*/
   munmap(elf, s.st_size);
 }
 
-/*
-void Break::get_shdr_vdso(ElfW(Addr) l_addr, char *l_name)
-{
-  ElfW(Ehdr) ehdr;
-  read_from_pid(pid_, sizeof (ElfW(Ehdr)), &ehdr, (void *)(uinptr_t)l_addr);
-  int shnum = ehdr.e_shnum;
-  if (ehdr.e_shstrndx == SHN_UNDEF)
-  {
-    std::cerr << "No section header string table index found" << std::endl;
-    return;
-  }
-  ElfW(Shdr) shdr_ad;
-  shdr_ad = (ElfW(Shdr))((uintptr_t)ehdr + (uintptr_t)ehdr.e_shoff +
-                           ((uintptr_t)ehdr.e_shstrndx * (uintptr_t)ehdr.e_shentsize));
-  for (int i = 0; i < shnum; i++)   iterate on each shdr
-  {
-    shdr_ad = (ElfW(Shdr) *)((char *)ehdr +
-                             (uintptr_t)ehdr.e_shoff + (i * (uintptr_t)ehdr.e_shentsize));
-    if ((shdr_ad->sh_flags & SHF_EXECINSTR) == 4)
-      update_break(l_addr, shdr_ad->sh_offset, shdr_ad->sh_size, l_name);
-  }
-}
-*/
-
 void Break::load_lo(struct link_map *l_map)
 {
   char name[512];

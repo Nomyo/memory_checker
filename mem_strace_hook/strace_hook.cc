@@ -45,7 +45,6 @@ int main(int argc, char *argv[])
   Break l_break(child, tr.r_debug->r_state, argv[0]);
   set_break((void *)tr.r_debug->r_brk, tr.child);
   l_break.init_break();
-  /* should set breakpoints in our own .init .text */
   
   struct user_regs_struct regs;
   while (true)
