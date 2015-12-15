@@ -48,7 +48,7 @@ int trace_child(pid_t child)
           break;
         }
       ptrace(PTRACE_GETREGS, child, NULL, &regs);
-      if (regs.rax != -ENOSYS) /* if not on entry */
+      if ((int)regs.rax != -ENOSYS) /* if not on entry */
         p_syscall(regs.orig_rax, regs, child);
     }
   return 0;
