@@ -275,24 +275,61 @@ void Tracker::wrap_malloc_e(struct user_regs_struct regs)
 
 void Tracker::wrap_realloc_b(struct user_regs_struct regs)
 {
-  struct S_mem s;
-  s.addr = 0;
-  s.len = regs.rdi;
-  s.prot = -1; /* right before libc malloc call so we do 
-                  not have the return address yet*/
-  ls_mem_.push_back(s);  
+  if (regs.rdi == 0) /* ptr is NULL so act like malloc */
+  {
+    struct S_mem s;  /* right before libc malloc call so we do */ 
+    s.addr = 0;      /* not have the return address yet*/
+    s.len = regs.rsi;
+    s.prot = -1;
+    ls_mem_.push_back(s);  
+  }
+  else if (regs.rsi == 0) /* size is NULL act like free */
+  {
+    for (auto i = ls_mem_.begin(); i != ls_mem_.end(); ++i)
+    {
+      if (i->addr == regs.rdi)
+      {
+        printf("realloc { addr = 0x%lx, len = 0x%llx }\n"
+               , i->addr, regs.rsi);
+        ls_mem_.erase(i);
+        return;
+      }
+    }    
+  }
+  else
+  {
+    for (auto i = ls_mem_.begin(); i != ls_mem_.end(); ++i)
+    {
+      if (i->addr == regs.rdi)
+      {
+        i->prot = -1; /* unset the struct in order to tell at the end of realloc */
+        printf("realloc { addr = 0x%lx, len = 0x%lx }\n"
+               , i->addr, i->len);
+        i->len = regs.rsi;
+      }
+    }
+  }
 }
 
 void Tracker::wrap_realloc_e(struct user_regs_struct regs)
 {
   for (auto i = ls_mem_.begin(); i != ls_mem_.end(); ++i)
   {
-    if (i->prot == -1)
+    if (i->prot == -1) /* looking for unset structure */
     {
-      i->addr = regs.rax;
+      if (i->addr == 0)
+      {
+        printf("realloc { addr = 0x%llx, len = 0x%lx }\n"
+               , regs.rax, i->len);
+        i->addr = regs.rax;
+      }
+      else
+        printf("\tto { addr = 0x%llx, len = 0x%lx }\n"
+               , regs.rax, i->len);
+      
+      if (i->addr == regs.rax)
+        i->addr = regs.rax;
       i->prot = 0;
-      printf("malloc { addr = 0x%lx, len = 0x%lx }\n"
-             , i->addr, i->len);
       return;
     }
   }
@@ -314,27 +351,27 @@ void Tracker::wrap_free(struct user_regs_struct regs)
 
 int Tracker::check_reg(struct user_regs_struct regs)
 {
-  if (regs.r11 == 0xfffffffc01dc0ffe) /* malloc begins */
+  if (regs.r10 == 0xfffffffc01dc0ffe) /* malloc begins */
   {
     wrap_malloc_b(regs);
     return 1;
   }
-  else if (regs.r11 == 0xfffffffc0ffec01d) /* end of malloc */
+  else if (regs.r10 == 0xfffffffc0ffec01d) /* end of malloc */
   {
     wrap_malloc_e(regs);
     return 1;
   }
-  else if (regs.r11 == 0xc01db3afffffffff) /* free call */
+  else if (regs.r10 == 0xc01db3afffffffff) /* free call */
   {
     wrap_free(regs);
     return 1;
   }
-  else if (regs.r11 == 0xffffffff5417b3af) /* realloc begins */
+  else if (regs.r10 == 0xffffffff5417b3af) /* realloc begins */
   {
     wrap_realloc_b(regs);
     return 1;
   }
-  else if (regs.r11 == 0x5417b3afffffffff) /* end of realloc */
+  else if (regs.r10 == 0x5417b3afffffffff) /* end of realloc */
   {
     wrap_realloc_e(regs);
     return 1;
