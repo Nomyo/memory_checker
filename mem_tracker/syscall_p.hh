@@ -10,6 +10,5 @@
 
 void p_syscall(int sys_num, struct user_regs_struct regs,
                pid_t child);
-void p_sys_exit(int sys_num, int exit_value,
-                pid_t child);
+void p_sys_exit(int sys_num, int exit_value);
 #endif /* !SYSCALL_P */

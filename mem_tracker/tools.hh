@@ -5,6 +5,8 @@
 #include <elf.h>
 #include <unistd.h>
 #include <link.h>
+#include <string.h>
+
 
 namespace Tools
 {

@@ -28,6 +28,14 @@ public:
   Tracker(pid_t pid, int state, char *name);
   ~Tracker();
   
+  void print_breaks();
+  int get_state();
+  void set_state(int state);
+  void set_pid(pid_t pid);
+  pid_t get_pid();
+  void print_lib_name(struct link_map *l_map);
+
+  /* functions that handle load objects and breakpoints */
   void update_break(ElfW(Addr) l_addr, ElfW(Off) off,
                     ElfW(Xword) size, char *l_name);
   void get_shdr(ElfW(Ehdr) *elf_addr, ElfW(Addr) l_addr, char *name);
@@ -37,19 +45,26 @@ public:
                   struct user_regs_struct regs);
   void add_break(uintptr_t addr, std::string l_name);
   int rem_break(uintptr_t addr, char *l_name, struct user_regs_struct regs);
-  void print_breaks();
-  int get_state();
-  void set_state(int state);
-  void set_pid(pid_t pid);
-  pid_t get_pid();
-  void print_lib_name(struct link_map *l_map);
   void rem_loadobj(struct link_map *l_map);
   void init_break();
+
+  void wrap_alloc_syscall(unsigned long sysnum, struct user_regs_struct regs);
+  int check_reg(struct user_regs_struct regs);
+  
+  /* wrapper that analyse pid_ registers, print and fill ls_mem_ struct */
   void wrap_mmap(struct user_regs_struct regs);
+  void wrap_mprotect(struct user_regs_struct regs);
   void wrap_munmap(struct user_regs_struct regs);
   void wrap_mremap(struct user_regs_struct regs);
-  void wrap_alloc_syscall(unsigned long sysnum, struct user_regs_struct regs);
   void wrap_brk(struct user_regs_struct regs);
+  void wrap_free(struct user_regs_struct regs);
+  void wrap_malloc_e(struct user_regs_struct regs);
+  void wrap_malloc_b(struct user_regs_struct regs);
+  void wrap_realloc_e(struct user_regs_struct regs);
+  void wrap_realloc_b(struct user_regs_struct regs);
+  void wrap_calloc_e(struct user_regs_struct regs);
+  void wrap_calloc_b(struct user_regs_struct regs);
+    
   void print_ls_mem();
 
 private:

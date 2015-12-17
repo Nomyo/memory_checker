@@ -17,10 +17,10 @@ void p_syscall(int sys_num, struct user_regs_struct regs, pid_t child)
     printf("[pid %d] brk () = 0x%llx\n", child, regs.rax);
 }
 
-void p_sys_exit(int sys_num, int exit_value, pid_t child)
+void p_sys_exit(int sys_num, int exit_value)
 {
   if (sys_num == 60) /* exit */
-    printf("[pid %d] exit () = %d\n", child, exit_value);
+    printf("exit () = %d\n", exit_value);
   if (sys_num == 231) /* exit_group */
-    printf("[pid %d] exit_group () = %d\n", child, exit_value);
+    printf("exit_group () = %d\n", exit_value);
 }
