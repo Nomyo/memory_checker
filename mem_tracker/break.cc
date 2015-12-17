@@ -111,7 +111,8 @@ void Tracker::load_lo(struct link_map *l_map)
   char name[512];
   ElfW(Ehdr) *elf;
   l_map = Tools::get_load_obj_next(pid_, l_map); // Bypass first l_map
-  while (l_map)
+
+  while (l_map)  /* FIX SEGFAULT condition l_map = l_map */
   {
     Tools::get_load_obj_name(pid_, l_map, name);
     struct link_map m;
@@ -180,12 +181,13 @@ void Tracker::rem_loadobj(struct link_map *l_map)
   char name[512];
   for (auto const &i : mbreak_)
   {
-    while (l_map)
+    l_map = Tools::get_load_obj_next(pid_, l_map);
+    while (l_map) /* FIX SEGFAULT condition */
     {
       Tools::get_load_obj_name(pid_, l_map, name);
       if (i.first.compare(name) == 0)
         break;
-      Tools::get_load_obj_next(pid_, l_map);
+      l_map = Tools::get_load_obj_next(pid_, l_map);
     }
     if (!l_map && i.first.compare(binary_) != 0)
     { 
@@ -202,11 +204,11 @@ int Tracker::treat_break(struct link_map *l_map, uintptr_t addr,
 {
   char name[512];
   l_map = Tools::get_load_obj_next(pid_, l_map); // Bypass first l_map
-  while (l_map)
+  while (l_map) /* FIX SEGFAULT condition */
   {
     Tools::get_load_obj_name(pid_, l_map, name);
     if (rem_break(addr, name, regs) == 1)
-      return 1;
+    return 1;
     l_map = Tools::get_load_obj_next(pid_, l_map);
   }
   return 0;
@@ -233,7 +235,7 @@ int Tracker::rem_break(uintptr_t addr, char *l_name, struct user_regs_struct reg
           if (WIFEXITED(status))
           {
             ptrace(PTRACE_GETREGS, pid_, NULL, &regs);
-            p_sys_exit(regs.rax, WEXITSTATUS(status), pid_);
+            p_sys_exit(regs.rax, WEXITSTATUS(status));
             print_ls_mem();
             printf("++++++ exited with %d ++++++\n", WEXITSTATUS(status));
             return 1;
@@ -259,7 +261,7 @@ void Tracker::print_lib_name(struct link_map *l_map)
 {
   char name[512];
   l_map = Tools::get_load_obj_next(pid_, l_map);
-  while (l_map)
+  while (l_map) /* FIX SEGFAULT condition */
   {
     Tools::get_load_obj_name(pid_, l_map, name);
     printf("Lib name :%s \n", name);
