@@ -302,6 +302,17 @@ void Tracker::wrap_realloc_b(struct user_regs_struct regs)
   }
 }
 
+void Tracker::wrap_calloc_b(struct user_regs_struct regs)
+{
+  struct S_mem s;
+  s.addr = regs.r9;
+  s.len = regs.r11 * regs.r12;
+  s.prot = 0;
+  printf("calloc { addr = 0x%lx, len = 0x%lx }\n"
+         , s.addr, s.len);
+  ls_mem_.push_back(s);  
+}
+
 void Tracker::wrap_free(struct user_regs_struct regs)
 {
   for (auto i = ls_mem_.begin(); i != ls_mem_.end(); ++i)
@@ -331,6 +342,11 @@ int Tracker::check_reg(struct user_regs_struct regs)
   else if (regs.r10 == 0x5417b3afffffffff)
   {
     wrap_realloc_b(regs);
+    return 1;
+  }
+  else if (regs.r10 == 0xc01dc01dc01dc01d)
+  {
+    wrap_calloc_b(regs);
     return 1;
   }
   return 0;
