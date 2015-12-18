@@ -32,10 +32,8 @@ void parsing_cmd_line(int argc, char **argv[], bool *b)
         exit(1);
       }
     else
-    {
       (*argv) += 2;
       *b = true;
-    }
   }
 }
 
@@ -43,8 +41,17 @@ int in_child(char *argv[], bool load_lib)
 {
   ptrace(PTRACE_TRACEME, 0, 0, 0);
   if (load_lib)
-    setenv("LD_PRELOAD", argv[0], 1);
-  return execvp(argv[1], argv);  
+  {
+    char **tmp = argv + 1;
+    if (setenv("LD_PRELOAD", argv[0], 1) == -1)
+      argv--;
+    return execvp(tmp[0], tmp);
+  }
+  else
+  {
+    argv++;
+    return execvp(argv[0], argv);
+  }
 }
 
 int main(int argc, char *argv[])

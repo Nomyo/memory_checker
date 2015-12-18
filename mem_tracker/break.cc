@@ -59,8 +59,6 @@ void Tracker::update_break(ElfW(Addr) l_addr, ElfW(Off) off,
     }
     cs_free(insn, count);
   }
-  else
-    std::cerr << "Couldn't disassemble instruction" << std::endl;
   free(code);
   cs_close(&handle);
 }
