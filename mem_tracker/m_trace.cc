@@ -90,12 +90,12 @@ void Tracker::wrap_mprotect(struct user_regs_struct regs)
     return;
   }
   for (auto i = ls_mem_.begin(); i != ls_mem_.end(); ++i)
-  {
+  { 
     if (addr_b >= i->addr && i->addr >= addr_e
         && addr_b >= i->addr - i->len && i->addr - i->len <= addr_e)
     {
-      printf("[pid %d] mprotect { addr = 0x%llx, len = 0x%llx, prot = %d }\n",
-             pid_, regs.rdi, regs.rsi, prot);
+      printf("mprotect { addr = 0x%llx, len = 0x%llx, prot = %d }\n",
+             regs.rdi, regs.rsi, prot);
       i->prot = prot;
       acc++;
     }
@@ -103,8 +103,8 @@ void Tracker::wrap_mprotect(struct user_regs_struct regs)
     {
       if (i->prot == prot) /* do not split */
       {
-        printf("[pid %d] mprotect{ addr = 0x%llx, len = 0x%llx, prot = %d }\n",
-               pid_, regs.rdi, regs.rsi, prot);
+        printf("mprotect{ addr = 0x%llx, len = 0x%llx, prot = %d }\n",
+               regs.rdi, regs.rsi, prot);
         acc++;
       }
       else
@@ -114,8 +114,8 @@ void Tracker::wrap_mprotect(struct user_regs_struct regs)
         s.len = i->len - (i->addr - addr_b);
         s.prot = prot;
         ls_mem_.push_front(s);
-        printf("[pid %d] mprotect{ addr = 0x%lx, len = 0x%lx, prot = %ld } into\n",
-               pid_, i->addr, i->len, i->prot);
+        printf("mprotect{ addr = 0x%lx, len = 0x%lx, prot = %ld } into\n",
+               i->addr, i->len, i->prot);
         i->len = i->len - (addr_b - i->addr - i->len);
         printf("\t* { addr = 0x%lx, len = 0x%lx, prot = %ld }\n",
                i->addr, i->len, i->prot);
@@ -128,8 +128,8 @@ void Tracker::wrap_mprotect(struct user_regs_struct regs)
     {
       if (i->prot == prot) /* do not split */
       {
-        printf("[pid %d] mprotect{ addr = 0x%llx, len = 0x%llx, prot = %d }\n",
-               pid_, regs.rdi, regs.rsi, prot);
+        printf("mprotect{ addr = 0x%llx, len = 0x%llx, prot = %d }\n",
+               regs.rdi, regs.rsi, prot);
         acc++;
       }
       else
@@ -139,8 +139,8 @@ void Tracker::wrap_mprotect(struct user_regs_struct regs)
         s.len = i->len - (addr_e - i->addr + i->len);
         s.prot = prot;
         ls_mem_.push_front(s);
-        printf("[pid %d] mprotect{ addr = 0x%lx, len = 0x%lx, prot = %ld } into\n",
-               pid_, i->addr, i->len, i->prot);
+        printf("mprotect{ addr = 0x%lx, len = 0x%lx, prot = %ld } into\n",
+               i->addr, i->len, i->prot);
         i->addr = addr_e;
         printf("\t* { addr = 0x%lx, len = 0x%lx, prot = %d }\n",
                s.addr, s.len, prot);
@@ -154,14 +154,14 @@ void Tracker::wrap_mprotect(struct user_regs_struct regs)
     {
       if (i->prot == prot) /* do not split */
       {
-        printf("[pid %d] mprotect{ addr = 0x%llx, len = 0x%llx, prot = %d }\n",
-               pid_, regs.rdi, regs.rsi, prot);
+        printf("protect{ addr = 0x%llx, len = 0x%llx, prot = %d }\n",
+                regs.rdi, regs.rsi, prot);
         acc++;
       }
       else
       {
-        printf("[pid %d] mprotect split { addr = 0x%lx, len = 0x%lx, prot = %ld } into\n",
-               pid_, i->addr, i->len, i->prot);
+        printf("mprotect split { addr = 0x%lx, len = 0x%lx, prot = %ld } into\n",
+               i->addr, i->len, i->prot);
         int tmp = i->len;
         i->len = i->len - (addr_b - i->addr - i->len);
         printf("\t* { addr = 0x%lx, len = 0x%lx, prot = %ld }\n",
@@ -189,12 +189,11 @@ void Tracker::wrap_mprotect(struct user_regs_struct regs)
            regs.rdi, regs.rsi, prot);
 }
 
-
 void Tracker::wrap_mremap(struct user_regs_struct regs)
 {
   for (auto i = ls_mem_.begin(); i != ls_mem_.end(); ++i)
   {
-    if (i->addr == regs.rdi)
+    if (i->addr == regs.rdi && i->prot != -1)
     {
       if (regs.rsi == 0)
       {
@@ -253,7 +252,7 @@ void Tracker::wrap_malloc_b(struct user_regs_struct regs)
   struct S_mem s;
   s.addr = regs.r12;
   s.len = regs.r11;
-  s.prot = 0;
+  s.prot = -1;
   printf("malloc { addr = 0x%lx, len = 0x%lx }\n"
          , s.addr, s.len);
   ls_mem_.push_back(s);  
@@ -266,7 +265,7 @@ void Tracker::wrap_realloc_b(struct user_regs_struct regs)
     struct S_mem s;  /* right before libc malloc call so we do */ 
     s.addr = regs.r9;      /* not have the return address yet*/
     s.len = regs.r11;
-    s.prot = 0;
+    s.prot = -1;
     printf("realloc { addr = 0x%lx, len = 0x%lx }\n"
            , s.addr, s.len);
     ls_mem_.push_back(s);
@@ -290,7 +289,7 @@ void Tracker::wrap_realloc_b(struct user_regs_struct regs)
     {
       if (i->addr == regs.r12)
       {
-        i->prot = 0; /* unset the struct in order to tell at the end of realloc */
+        i->prot = -1; /* unset the struct in order to tell at the end of realloc */
         printf("realloc { addr = 0x%lx, len = 0x%lx }\n"
                , i->addr, i->len);
         printf("\tto { addr = 0x%llx, len = 0x%llx }\n"
@@ -307,7 +306,7 @@ void Tracker::wrap_calloc_b(struct user_regs_struct regs)
   struct S_mem s;
   s.addr = regs.r9;
   s.len = regs.r11 * regs.r12;
-  s.prot = 0;
+  s.prot = -1;
   printf("calloc { addr = 0x%lx, len = 0x%lx }\n"
          , s.addr, s.len);
   ls_mem_.push_back(s);  

@@ -33,6 +33,7 @@ int main(int argc, char *argv[])
   if (child == 0)
   {
     ptrace(PTRACE_TRACEME, 0, 0, 0);
+    setenv("LD_PRELOAD", "./myliballoc.so", 1);
     return execvp(argv[0], argv);
   }
   struct H_rdebug::auxv_info tr;
@@ -41,10 +42,13 @@ int main(int argc, char *argv[])
   waitpid(child, &status, 0);
   ptrace(PTRACE_SETOPTIONS, child, 0, PTRACE_O_TRACESYSGOOD);
   tr.child = child;
-  tr.init_tracker(); /* From here r_debug is set */
-  Tracker l_break(child, tr.r_debug->r_state, argv[0]);
+  tr.init_tracker(); 
+
+  /* From here r_debug is set */
+
+  Tracker tracker(child, tr.r_debug->r_state, argv[0]);
   set_break((void *)tr.r_debug->r_brk, tr.child);
-  l_break.init_break();
+  tracker.init_break();
   struct user_regs_struct regs;
   while (true)
   {
@@ -63,14 +67,15 @@ int main(int argc, char *argv[])
       if ((unsigned long )regs.rip - 1 == (unsigned long)tr.r_debug->r_brk)
       {
         if (tr.r_debug->r_state == r_debug::RT_CONSISTENT) /* add or del lib*/
-          l_break.update(tr.r_debug->r_map); // update breakpoints
+          tracker.update(tr.r_debug->r_map); // update breakpoints
         else
-          l_break.set_state(tr.r_debug->r_state); /* get previous state */
+          tracker.set_state(tr.r_debug->r_state); /* get previous state */
       }
       else
       {
-        if (l_break.treat_break(tr.r_debug->r_map, regs.rip - 1, regs) == 1)
-          break;
+        if (tracker.check_reg(regs) == 0)
+          if (tracker.treat_break(tr.r_debug->r_map, regs.rip - 1, regs) == 1)
+            break;
       }
     }
   }

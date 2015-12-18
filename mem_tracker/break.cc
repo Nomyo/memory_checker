@@ -111,8 +111,7 @@ void Tracker::load_lo(struct link_map *l_map)
   char name[512];
   ElfW(Ehdr) *elf;
   l_map = Tools::get_load_obj_next(pid_, l_map); // Bypass first l_map
-
-  while (l_map)  /* FIX SEGFAULT condition l_map = l_map */
+  while (l_map)  
   {
     Tools::get_load_obj_name(pid_, l_map, name);
     struct link_map m;
