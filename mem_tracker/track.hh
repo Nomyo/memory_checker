@@ -58,11 +58,8 @@ public:
   void wrap_mremap(struct user_regs_struct regs);
   void wrap_brk(struct user_regs_struct regs);
   void wrap_free(struct user_regs_struct regs);
-  void wrap_malloc_e(struct user_regs_struct regs);
   void wrap_malloc_b(struct user_regs_struct regs);
-  void wrap_realloc_e(struct user_regs_struct regs);
   void wrap_realloc_b(struct user_regs_struct regs);
-  void wrap_calloc_e(struct user_regs_struct regs);
   void wrap_calloc_b(struct user_regs_struct regs);
     
   void print_ls_mem();
