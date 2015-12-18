@@ -14,11 +14,37 @@
 #include <dlfcn.h>
 #include <sys/reg.h>
 #include <sys/user.h>
+#include <getopt.h>
 
 void set_break(void *addr, pid_t pid)
 {
   unsigned long ins = ptrace(PTRACE_PEEKDATA, pid, addr);
   ptrace(PTRACE_POKEDATA, pid, addr, (ins & 0xffffffffffffff00) | 0xcc);
+}
+
+void parsing_cmd_line(int argc, char **argv[], bool *b)
+{
+  if (strcmp((*argv)[1], "--preload") == 0)
+  {
+    if (argc < 4)
+      {
+        std::cerr << "too few arguments" << std::endl;
+        exit(1);
+      }
+    else
+    {
+      (*argv) += 2;
+      *b = true;
+    }
+  }
+}
+
+int in_child(char *argv[], bool load_lib)
+{
+  ptrace(PTRACE_TRACEME, 0, 0, 0);
+  if (load_lib)
+    setenv("LD_PRELOAD", argv[0], 1);
+  return execvp(argv[1], argv);  
 }
 
 int main(int argc, char *argv[])
@@ -28,14 +54,11 @@ int main(int argc, char *argv[])
     std::cerr << "usage: " << argv[0] << " arg\n";
     exit(1);
   }
+  bool load_lib = false;
+  parsing_cmd_line(argc, &argv, &load_lib);
   pid_t child = fork();
-  argv++;
   if (child == 0)
-  {
-    ptrace(PTRACE_TRACEME, 0, 0, 0);
-    setenv("LD_PRELOAD", "./myliballoc.so", 1);
-    return execvp(argv[0], argv);
-  }
+    in_child(argv, load_lib);
   struct H_rdebug::auxv_info tr;
   tr.r_debug = (struct r_debug *)malloc(sizeof (struct r_debug));
   int status;
