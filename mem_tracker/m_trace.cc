@@ -24,42 +24,43 @@ void Tracker::wrap_munmap(struct user_regs_struct regs)
 {
   unsigned long addr_b = regs.rdi;
   unsigned long len = regs.rsi;
-  unsigned long addr_e = addr_b - len;
+  unsigned long addr_e = addr_b + len - 1;
   std::list<std::list<S_mem>::iterator> l_it;
   int acc = 0;
   for (auto i = ls_mem_.begin(); i != ls_mem_.end(); ++i)
   {
-    if (addr_b >= i->addr && i->addr >= addr_e
-        && addr_b >= i->addr - i->len && i->addr - i->len <= addr_e) /* free mapping */
+    if (addr_e >= i->addr + i->len && i->addr + i->len >= addr_b
+        && addr_e >= i->addr && i->addr >= addr_b)
     {
       printf("munmap { addr = 0x%llx, len = 0x%llx, prot = %ld }\n",
              regs.rdi, regs.rsi, i->prot);
       l_it.push_back(i);
       acc++;
     }
-    else if (i->addr > addr_b && i->addr - i->len <= addr_b  && i->addr - i->len >= addr_e)
-    {
-      printf("munmap { addr = 0x%llx, len = 0x%llx, prot = %ld }\n",
-             regs.rdi, regs.rsi, i->prot);
-      i->len = i->len - (addr_b - i->addr - i->len);
-      acc++;
-    }
-    else if (addr_b >= i->addr && i->addr >= addr_e && i->addr - len < addr_e)
+    else if (i->addr + i->len > addr_e && i->addr <= addr_e  && i->addr >= addr_b)
     {
       printf("munmap { addr = 0x%llx, len = 0x%llx, prot = %ld }\n",
              regs.rdi, regs.rsi, i->prot);
       i->addr = addr_e;
-      i->len = i->len - (addr_e - i->addr - i->len );
+      i->len = i->addr + i->len - addr_e;
       acc++;
     }
-    else if (i->addr > addr_b && i->addr - len < addr_b && addr_e > i->addr - len) /* split */
+    else if (addr_e >= i->addr + i->len && i->addr + i->len >= addr_b && i->addr < addr_b)
+    {
+      printf("munmap { addr = 0x%llx, len = 0x%llx, prot = %ld }\n",
+             regs.rdi, regs.rsi, i->prot);
+      i->len = i->addr + i->len - addr_b;
+      acc++;
+    }
+    else if (i->addr + i->len > addr_e && i->addr < addr_e && addr_b > i->addr) /* split */
     {
       printf("munmap split { addr = 0x%lx, len = 0x%lx, prot = %ld } into\n",
              i->addr, i->len, i->prot);
-      i->len = i->len - (addr_b - i->addr - i->len);
+      unsigned long tmp = i->len;
+      i->len = addr_b - i->addr;
       struct S_mem s;
       s.addr = addr_e;
-      s.len = i->len - (addr_e - i->addr - i->len );
+      s.len = i->addr + tmp - addr_e;
       s.prot = i->prot;
       printf("\t* { addr = 0x%lx, len = 0x%lx, prot = %ld }\n",
              i->addr, i->len, i->prot);
@@ -81,7 +82,7 @@ void Tracker::wrap_mprotect(struct user_regs_struct regs)
   unsigned long addr_b = regs.rdi;
   unsigned long len = regs.rsi;
   int prot = regs.rdx;
-  unsigned long addr_e = addr_b - len;
+  unsigned long addr_e = addr_b + len - 1;
   int acc = 0;
   if (regs.rax) /* if -ENOMEM mprotect failed */
   {
@@ -91,15 +92,40 @@ void Tracker::wrap_mprotect(struct user_regs_struct regs)
   }
   for (auto i = ls_mem_.begin(); i != ls_mem_.end(); ++i)
   { 
-    if (addr_b >= i->addr && i->addr >= addr_e
-        && addr_b >= i->addr - i->len && i->addr - i->len <= addr_e)
+    if (addr_e >= i->addr + i->len && i->addr + i->len >= addr_b
+        && addr_e >= i->addr && i->addr >= addr_b)
     {
       printf("mprotect { addr = 0x%llx, len = 0x%llx, prot = %d }\n",
              regs.rdi, regs.rsi, prot);
       i->prot = prot;
       acc++;
     }
-    else if (i->addr > addr_b && i->addr - i->len <= addr_b  && i->addr - i->len >= addr_e)
+    else if (i->addr + i->len > addr_e && i->addr <= addr_e  && i->addr >= addr_b)
+    {
+      if (i->prot == prot) /* do not split */
+      {
+        printf("mprotect{ addr = 0x%llx, len = 0x%llx, prot = %d }\n",
+               regs.rdi, regs.rsi, prot);
+        acc++;
+      }
+      else
+      {
+        struct S_mem s;
+        s.addr = addr_e;
+        s.len = i->len + i->addr - s.addr;
+        s.prot = prot;
+        ls_mem_.push_front(s);
+        printf("mprotect{ addr = 0x%lx, len = 0x%lx, prot = %ld } into\n",
+               i->addr, i->len, i->prot);
+        i->len = i->len - s.len;
+        printf("\t* { addr = 0x%lx, len = 0x%lx, prot = %ld }\n",
+               i->addr, i->len, i->prot);
+        printf("\t* { addr = 0x%lx, len = 0x%lx, prot = %d }\n",
+               s.addr, s.len, prot);
+        acc++;
+      }
+    }
+    else if (addr_e >= i->addr + i->len && i->addr + i->len >= addr_b && i->addr < addr_b)
     {
       if (i->prot == prot) /* do not split */
       {
@@ -111,46 +137,20 @@ void Tracker::wrap_mprotect(struct user_regs_struct regs)
       {
         struct S_mem s;
         s.addr = addr_b;
-        s.len = i->len - (i->addr - addr_b);
+        s.len = i->len + i->addr - addr_b;
         s.prot = prot;
         ls_mem_.push_front(s);
         printf("mprotect{ addr = 0x%lx, len = 0x%lx, prot = %ld } into\n",
                i->addr, i->len, i->prot);
-        i->len = i->len - (addr_b - i->addr - i->len);
-        printf("\t* { addr = 0x%lx, len = 0x%lx, prot = %ld }\n",
-               i->addr, i->len, i->prot);
         printf("\t* { addr = 0x%lx, len = 0x%lx, prot = %d }\n",
                s.addr, s.len, prot);
-        acc++;
-      }
-    }
-    else if (addr_b >= i->addr && i->addr >= addr_e && i->addr - len < addr_e)
-    {
-      if (i->prot == prot) /* do not split */
-      {
-        printf("mprotect{ addr = 0x%llx, len = 0x%llx, prot = %d }\n",
-               regs.rdi, regs.rsi, prot);
-        acc++;
-      }
-      else
-      {
-        struct S_mem s;
-        s.addr = i->addr;
-        s.len = i->len - (addr_e - i->addr + i->len);
-        s.prot = prot;
-        ls_mem_.push_front(s);
-        printf("mprotect{ addr = 0x%lx, len = 0x%lx, prot = %ld } into\n",
-               i->addr, i->len, i->prot);
-        i->addr = addr_e;
-        printf("\t* { addr = 0x%lx, len = 0x%lx, prot = %d }\n",
-               s.addr, s.len, prot);
-        i->len = i->len - (addr_b - i->addr - i->len);
+        i->len = i->len - s.len;
         printf("\t* { addr = 0x%lx, len = 0x%lx, prot = %ld }\n",
                i->addr, i->len, i->prot);
         acc++;
       }
     }
-    else if (i->addr > addr_b && i->addr - len < addr_b && addr_e > i->addr - len) /* split */
+    else if (i->addr + i->len > addr_e && i->addr < addr_e && addr_b > i->addr) /* split */
     {
       if (i->prot == prot) /* do not split */
       {
@@ -163,16 +163,16 @@ void Tracker::wrap_mprotect(struct user_regs_struct regs)
         printf("mprotect split { addr = 0x%lx, len = 0x%lx, prot = %ld } into\n",
                i->addr, i->len, i->prot);
         int tmp = i->len;
-        i->len = i->len - (addr_b - i->addr - i->len);
+        i->len = addr_b - i->addr;
         printf("\t* { addr = 0x%lx, len = 0x%lx, prot = %ld }\n",
                i->addr, i->len, i->prot);
         struct S_mem s2;
         s2.addr = addr_e;
-        s2.len = i->len - (addr_e - i->addr - i->len );
+        s2.len = i->addr + tmp;
         s2.prot = i->prot;
         struct S_mem s;
         s.addr = addr_b;
-        s.len = tmp - s2.len - i->len;
+        s.len = addr_e - addr_b;
         s.prot = prot;
         printf("\t* { addr = 0x%lx, len = 0x%lx, prot = %ld }\n",
                s.addr, s.len, s.prot);
