@@ -17,7 +17,7 @@ void Tracker::wrap_mmap(struct user_regs_struct regs)
     printf("mmap { addr = 0x%llx, len = 0x%llx, prot = %lld }\n",
            regs.rax, regs.rsi, regs.rdx);
     ls_mem_.push_back(s);
-    un_protect(s, regs);
+//    un_protect(s, regs);
   }
 }
 
