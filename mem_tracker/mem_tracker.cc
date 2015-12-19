@@ -32,19 +32,17 @@ void parsing_cmd_line(int argc, char **argv[], bool *b)
         exit(1);
       }
     else
-      (*argv) += 2;
       *b = true;
   }
 }
 
-int in_child(char *argv[], bool load_lib)
+int in_child(char *argv[], bool load_lib, char *lib)
 {
   ptrace(PTRACE_TRACEME, 0, 0, 0);
   if (load_lib)
   {
-    char **tmp = argv + 1;
-    if (setenv("LD_PRELOAD", argv[0], 1) == -1)
-      argv--;
+    char **tmp = argv + 3;
+    setenv("LD_PRELOAD", lib, 1);
     return execvp(tmp[0], tmp);
   }
   else
@@ -62,10 +60,19 @@ int main(int argc, char *argv[])
     exit(1);
   }
   bool load_lib = false;
+  char *lib = NULL;
+  char *bin = NULL;
   parsing_cmd_line(argc, &argv, &load_lib);
+  if (load_lib == true)
+  {
+    lib = argv[2];
+    bin = argv[3];
+  }
+  else
+    bin = argv[1];
   pid_t child = fork();
   if (child == 0)
-    in_child(argv, load_lib);
+    in_child(argv, load_lib, lib);
   struct H_rdebug::auxv_info tr;
   tr.r_debug = (struct r_debug *)malloc(sizeof (struct r_debug));
   int status;
@@ -76,7 +83,7 @@ int main(int argc, char *argv[])
 
   /* From here r_debug is set */
 
-  Tracker tracker(child, tr.r_debug->r_state, argv[0]);
+  Tracker tracker(child, tr.r_debug->r_state, bin);
   set_break((void *)tr.r_debug->r_brk, tr.child);
   tracker.init_break();
   struct user_regs_struct regs;
