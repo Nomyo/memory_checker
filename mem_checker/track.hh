@@ -64,9 +64,13 @@ public:
 
   /* funciton in order to check memory */
   void un_protect(struct S_mem map, struct user_regs_struct regs);
-  
+  void un_protect_all(struct user_regs_struct regs);
+  void re_protect(struct S_mem map, struct user_regs_struct regs);
+  void re_all_protect(struct user_regs_struct regs);
+  void is_invalid(uintptr_t addr, struct user_regs_struct regs);
   void print_ls_mem();
-
+  void get_current_inst(uintptr_t addr);
+  void show_leaks();
 private:
   std::map<std::string, std::map<uintptr_t, unsigned long>> mbreak_;
   pid_t pid_;
@@ -75,6 +79,7 @@ private:
   std::list<S_mem> ls_mem_;
   uintptr_t brk_ = 0;
   unsigned long brk_len_ = 0;
+  unsigned long mem_alloc_ = 0;
 };
 
 #endif /* !BREAK_HH */
