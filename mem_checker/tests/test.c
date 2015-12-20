@@ -1,4 +1,3 @@
-#define _GNU_SOURCE
 #include <stdio.h>
 #include <sys/mman.h>
 #include <stdint.h>
@@ -8,6 +7,8 @@
 
 int main()
 {
+  char *addr = (char *)mmap(NULL, 4096, PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);  
+  addr[4092] = 51;
   void *addr = malloc(1420);
   void *addre = malloc(9999);
   free(addre);

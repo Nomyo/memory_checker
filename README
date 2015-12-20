@@ -1,0 +1,54 @@
+  README :
+
+    The goal of this project is to implement our own memcheck tool,
+    thus a program that detects any invalid access and memory leaks.
+    The project is decomposed in four levels that are describe below.
+
+  Level 1 :
+
+    We had to implement a simple strace, that track all syscall in the
+    traced program. By the use of ptrace and its request like PTRACE_SYSCALL,
+    PTRACE_GETREGS and so on. In this level i didn't manage to follow the child
+    on fork.
+
+  Level 2 :
+
+    I spent many time on this level that aimed to reproduce an strace like, thus
+    tracing the syscall in the tracee. However, we had to break on every syscall in
+    order to get the control and retrieve information like the syscall num.
+    Once the r_debug structure is obtained, we have access to the link map. So i
+    just go through the link_map structure and loaded in a map of map container.
+    I used a map of map because, i stored the name of the loaded object name,
+    the address of the breakpoint and the instruction before setting the breakpoint.
+    The process to load the library i used is : open in the file system, the concerned
+    library, go through the elf to retrieve the section header, then disasssemble
+    all the executable section, retrieve the address of all syscall instruction, and
+    finally store this address and replace the instruction by a breakpoint.
+    Conclusion, by breaking on syscall and r_brk i know i should examine a syscall
+    or add/delete library.
+
+  Level 3:
+
+    In the level 3, i just had to track memory allocation, deallocation and
+    protection. I wrote i library that will be preload by the traced program
+    before its execution. In this library, malloc, calloc, realloc and free are
+    redefine. So each time the traced programm will call one of this function
+    , redefinition in my own library will be called. So by writting a wrapper
+    i can retrieve all information i want on the call and store structure that
+    represente the allocation in case of a malloc for exemple. The process
+    used to communicate with the tracer was : set a register with a magic number
+    in the function in the library, set other register with information we want
+    like the size, and add int3; all of this in assembly inline. By catching the
+    SIGTRAP send by the breakpoint and check the value of the different registers,
+    i can get every information i need on the call. For mmap, munmap, mremap and
+    mprotect nothing special but catching the corresponding syscall num is done.
+    I implemented the bonus for splitting in this threshold.
+
+  Level 4:
+
+    The goal of this threshold was to make our program acts like a memory checker.
+    I manage to detect invalid access in mapping memory when it was directly allocated
+    by mmap, numbers of leaks but it seems like my program isn't really accurate.
+    However i didn't success to detect invalid read or write directly in the heap,
+    my implementation of this feature lead to huge false positive invalid access.
+    So i decided to keep the safer one.

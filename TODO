@@ -1,0 +1,18 @@
+LEVEL 1
+  => strace [OK]
+  => follow child [KO]
+
+LEVEL 2
+  => r_debug  [OK]
+  => break on syscall [OK]
+
+LEVEL 3
+  => wrap allocator [OK]
+  => bonus/print information [OK]
+
+LEVEL 4
+  => remove page protection [OK]
+  => restore page protection [OK]
+  => detect invalid access from mmap [OK]
+  => detect invalid read/write [KO]
+  => detect invalid access in the heap [KO]
