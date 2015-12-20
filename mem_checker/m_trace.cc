@@ -8,18 +8,15 @@ void Tracker::wrap_mmap(struct user_regs_struct regs)
   s.len = regs.rsi;
   s.prot = regs.rdx;
   if (-regs.rax == ENOMEM)
-  {
-    printf("mmap { addr = 0x%llx, len = 0x%llx, prot = %lld } = - ENOMEM\n",
-           regs.rdi, regs.rsi, regs.rdx);
-  }
+    return;
   else
   {
-    printf("mmap { addr = 0x%llx, len = 0x%llx, prot = %lld }\n",
-           regs.rax, regs.rsi, regs.rdx);
     ls_mem_.push_back(s);
-//    un_protect(s, regs);
+    mem_alloc_ += s.len;
+    un_protect(s, regs);
   }
 }
+
 
 void Tracker::wrap_munmap(struct user_regs_struct regs)
 {
@@ -27,55 +24,43 @@ void Tracker::wrap_munmap(struct user_regs_struct regs)
   unsigned long len = regs.rsi;
   unsigned long addr_e = addr_b + len - 1;
   std::list<std::list<S_mem>::iterator> l_it;
-  int acc = 0;
   for (auto i = ls_mem_.begin(); i != ls_mem_.end(); ++i)
   {
     if (addr_e >= i->addr + i->len && i->addr + i->len >= addr_b
         && addr_e >= i->addr && i->addr >= addr_b)
     {
-      printf("munmap { addr = 0x%llx, len = 0x%llx, prot = %ld }\n",
-             regs.rdi, regs.rsi, i->prot);
       l_it.push_back(i);
-      acc++;
+      mem_alloc_ -= i->len;
     }
     else if (i->addr + i->len > addr_e && i->addr <= addr_e  && i->addr >= addr_b)
     {
-      printf("munmap { addr = 0x%llx, len = 0x%llx, prot = %ld }\n",
-             regs.rdi, regs.rsi, i->prot);
       i->addr = addr_e;
+      mem_alloc_ -= i->len;
       i->len = i->addr + i->len - addr_e;
-      acc++;
-    }
+      mem_alloc_ += i->len; 
+        }
     else if (addr_e >= i->addr + i->len && i->addr + i->len >= addr_b && i->addr < addr_b)
     {
-      printf("munmap { addr = 0x%llx, len = 0x%llx, prot = %ld }\n",
-             regs.rdi, regs.rsi, i->prot);
+      mem_alloc_ -= i->len;
       i->len = i->addr + i->len - addr_b;
-      acc++;
+      mem_alloc_ += i->len; 
     }
     else if (i->addr + i->len > addr_e && i->addr < addr_e && addr_b > i->addr) /* split */
     {
-      printf("munmap split { addr = 0x%lx, len = 0x%lx, prot = %ld } into\n",
-             i->addr, i->len, i->prot);
       unsigned long tmp = i->len;
+      mem_alloc_ -= i->len;
       i->len = addr_b - i->addr;
       struct S_mem s;
       s.addr = addr_e;
       s.len = i->addr + tmp - addr_e;
+      mem_alloc_ -= s.len;
       s.prot = i->prot;
-      printf("\t* { addr = 0x%lx, len = 0x%lx, prot = %ld }\n",
-             i->addr, i->len, i->prot);
-      printf("\t* { addr = 0x%lx, len = 0x%lx, prot = %ld }\n",
-             s.addr, s.len, s.prot);
+      mem_alloc_ += i->len + s.len;
       ls_mem_.push_back(s);
-      acc++;
     }
   }
   for (auto& i : l_it) /* erase all maps that are unmap */
     ls_mem_.erase(i);
-  if (acc == 0)
-    printf("munmap { addr = 0x%llx, len = 0x%llx, prot = ? }\n",
-           regs.rdi, regs.rsi);
 }
 
 void Tracker::wrap_mprotect(struct user_regs_struct regs)
@@ -84,89 +69,45 @@ void Tracker::wrap_mprotect(struct user_regs_struct regs)
   unsigned long len = regs.rsi;
   int prot = regs.rdx;
   unsigned long addr_e = addr_b + len - 1;
-  int acc = 0;
-  if (regs.rax) /* if -ENOMEM mprotect failed */
-  {
-    printf("mprotect { addr = 0x%llx, len = 0x%llx, prot = %d } = FAIL\n",
-           regs.rdi, regs.rsi, prot);
+  if (-regs.rax == ENOMEM) /* if -ENOMEM mprotect failed */
     return;
-  }
   for (auto i = ls_mem_.begin(); i != ls_mem_.end(); ++i)
   { 
     if (addr_e >= i->addr + i->len && i->addr + i->len >= addr_b
         && addr_e >= i->addr && i->addr >= addr_b)
     {
-      printf("mprotect { addr = 0x%llx, len = 0x%llx, prot = %d }\n",
-             regs.rdi, regs.rsi, prot);
       i->prot = prot;
-      acc++;
     }
     else if (i->addr + i->len > addr_e && i->addr <= addr_e  && i->addr >= addr_b)
     {
-      if (i->prot == prot) /* do not split */
-      {
-        printf("mprotect{ addr = 0x%llx, len = 0x%llx, prot = %d }\n",
-               regs.rdi, regs.rsi, prot);
-        acc++;
-      }
-      else
+      if (i->prot != prot) /* do not split */
       {
         struct S_mem s;
         s.addr = addr_e;
         s.len = i->len + i->addr - s.addr;
         s.prot = prot;
         ls_mem_.push_front(s);
-        printf("mprotect{ addr = 0x%lx, len = 0x%lx, prot = %ld } into\n",
-               i->addr, i->len, i->prot);
         i->len = i->len - s.len;
-        printf("\t* { addr = 0x%lx, len = 0x%lx, prot = %ld }\n",
-               i->addr, i->len, i->prot);
-        printf("\t* { addr = 0x%lx, len = 0x%lx, prot = %d }\n",
-               s.addr, s.len, prot);
-        acc++;
       }
     }
     else if (addr_e >= i->addr + i->len && i->addr + i->len >= addr_b && i->addr < addr_b)
     {
-      if (i->prot == prot) /* do not split */
-      {
-        printf("mprotect{ addr = 0x%llx, len = 0x%llx, prot = %d }\n",
-               regs.rdi, regs.rsi, prot);
-        acc++;
-      }
-      else
+      if (i->prot != prot) /* do not split */
       {
         struct S_mem s;
         s.addr = addr_b;
         s.len = i->len + i->addr - addr_b;
         s.prot = prot;
         ls_mem_.push_front(s);
-        printf("mprotect{ addr = 0x%lx, len = 0x%lx, prot = %ld } into\n",
-               i->addr, i->len, i->prot);
-        printf("\t* { addr = 0x%lx, len = 0x%lx, prot = %d }\n",
-               s.addr, s.len, prot);
         i->len = i->len - s.len;
-        printf("\t* { addr = 0x%lx, len = 0x%lx, prot = %ld }\n",
-               i->addr, i->len, i->prot);
-        acc++;
       }
     }
     else if (i->addr + i->len > addr_e && i->addr < addr_e && addr_b > i->addr) /* split */
     {
-      if (i->prot == prot) /* do not split */
+      if(i->prot != prot)
       {
-        printf("protect{ addr = 0x%llx, len = 0x%llx, prot = %d }\n",
-                regs.rdi, regs.rsi, prot);
-        acc++;
-      }
-      else
-      {
-        printf("mprotect split { addr = 0x%lx, len = 0x%lx, prot = %ld } into\n",
-               i->addr, i->len, i->prot);
         int tmp = i->len;
         i->len = addr_b - i->addr;
-        printf("\t* { addr = 0x%lx, len = 0x%lx, prot = %ld }\n",
-               i->addr, i->len, i->prot);
         struct S_mem s2;
         s2.addr = addr_e;
         s2.len = i->addr + tmp;
@@ -175,19 +116,11 @@ void Tracker::wrap_mprotect(struct user_regs_struct regs)
         s.addr = addr_b;
         s.len = addr_e - addr_b;
         s.prot = prot;
-        printf("\t* { addr = 0x%lx, len = 0x%lx, prot = %ld }\n",
-               s.addr, s.len, s.prot);
-        printf("\t* { addr = 0x%lx, len = 0x%lx, prot = %ld }\n",
-               s2.addr, s2.len, s2.prot);
         ls_mem_.push_front(s);
         ls_mem_.push_front(s2);
-        acc++;
       }
     }
   }
-  if (acc == 0)
-    printf("mprotect { addr = 0x%llx, len = 0x%llx, prot = %d }\n",
-           regs.rdi, regs.rsi, prot);
 }
 
 void Tracker::wrap_mremap(struct user_regs_struct regs)
@@ -198,17 +131,14 @@ void Tracker::wrap_mremap(struct user_regs_struct regs)
     {
       if (regs.rsi == 0)
       {
-        printf("mremap { addr = 0x%llx, len = 0x%llx, prot = %ld }\n",
-               regs.rax, regs.rdx, i->prot);
+        mem_alloc_ -= i->len;
         ls_mem_.erase(i);
         break;
       }
-      printf("mremap { addr = 0x%lx, len = 0x%lx, prot = %ld }\n",
-             i->addr, i->len, i->prot);
+      mem_alloc_ -= i->len;
       i->len = regs.rdx;
+      mem_alloc_ += i->len;
       i->addr = regs.rax;
-      printf("\tto { addr = 0x%lx, len = 0x%lx, prot = %ld }\n",
-             i->addr, i->len, i->prot);
       break;
     }
   }
@@ -220,31 +150,6 @@ void Tracker::print_ls_mem()
   {
     printf("MAP AT : 0x%lx with len 0x%lx, and prot = %ld\n",
            i.addr, i.len, i.prot);
-  }
-}
-
-void Tracker::wrap_brk(struct user_regs_struct regs)
-{
-  if (brk_ == 0)
-    brk_ = (uintptr_t)regs.rax;
-  else
-  {
-    if (brk_len_)
-    {
-      printf("brk { addr = 0x%lx, len = 0x%lx, prot = 0 }\n",
-             brk_, brk_len_);
-      brk_len_ = brk_len_ + regs.rdi - brk_; 
-      printf("\tto { addr = 0x%lx, len = 0x%lx, prot = 0 }\n",
-             brk_, brk_len_);
-    }
-    else
-    {
-      printf("brk { addr = 0x%lx, len = (nil), prot = 0 }\n",
-             brk_);
-      brk_len_ = brk_len_ + regs.rdi - brk_; 
-      printf("\tto { addr = 0x%lx, len = 0x%lx, prot = 0 }\n",
-             brk_, brk_len_);
-    }
   }
 }
 
@@ -361,8 +266,6 @@ void Tracker::wrap_alloc_syscall(unsigned long sysnum,
     wrap_munmap(regs);
   else if (sysnum == __NR_mremap)
     wrap_mremap(regs);
-  else if (sysnum == __NR_brk)
-    wrap_brk(regs);
   else if (sysnum == __NR_mprotect)
     wrap_mprotect(regs);
 }

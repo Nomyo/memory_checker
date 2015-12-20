@@ -1,4 +1,3 @@
-
 #define _GNU_SOURCE
 #include <stdint.h>
 #include <dlfcn.h>
@@ -7,6 +6,7 @@
 #include <unistd.h>
 #include <sys/ptrace.h>
 
+
 void *malloc(size_t size)
 {
   static void *(*malloc_ptr)(size_t size);
@@ -14,7 +14,7 @@ void *malloc(size_t size)
   if (!malloc_ptr) /* get address of malloc */
     malloc_ptr = (void *(*) (size_t))dlsym(RTLD_NEXT, "malloc");
   addr = malloc_ptr(size);
-  __asm__ __volatile__("push %r12");
+  __asm__ __volatile__("push %r12");  /* save the registers */
   __asm__ __volatile__("push %r11");
   __asm__ __volatile__("push %r10");
   __asm__ __volatile__("mov $0xfffffffc0ffec01d ,%r10\n");
@@ -28,6 +28,7 @@ void *malloc(size_t size)
   return addr;
 }
 
+
 void free(void *addr)
 {
   __asm__ __volatile__("push %r10");
@@ -40,6 +41,7 @@ void free(void *addr)
     free_ptr = (void (*) (void *))dlsym(RTLD_NEXT, "free");
   free_ptr(addr);
 }
+
 
 void *realloc(void *ptr, size_t size)
 {
@@ -62,6 +64,7 @@ void *realloc(void *ptr, size_t size)
   __asm__ __volatile__("mov $0x0, %r10\n");
   return addr;
 }
+
 
 void *calloc(size_t nmemb, size_t size)
 {

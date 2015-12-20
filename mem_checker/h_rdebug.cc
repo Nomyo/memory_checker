@@ -13,6 +13,8 @@
 
 namespace H_rdebug
 {
+ 
+  // get programm header from the proc/pid/auxv 
   void auxv_info::get_phdr()
   {
     std::ifstream file;
@@ -45,6 +47,8 @@ namespace H_rdebug
     file.close();
   }
   
+
+  // get the r_debug and store it
   void auxv_info::get_r_debug_addr()
   {
     struct r_debug *r_child;
@@ -54,7 +58,7 @@ namespace H_rdebug
     char buf[512] = { 0 };
     local[0].iov_base = buf;
     local[0].iov_len = sizeof (ElfW(Phdr));
-    for (unsigned i = 0; i < phnum; i++, ite++)
+    for (unsigned i = 0; i < phnum; i++, ite++) // looking for PT_DYNAMIC
     {
       remote[0].iov_base = ite;
       remote[0].iov_len = sizeof (ElfW(Phdr));
@@ -71,7 +75,7 @@ namespace H_rdebug
     local[0].iov_len = sizeof (ElfW(Dyn));
     do
     {
-      while (true)
+      while (true) // looking for the DT_DEBUG
       {
         remote[0].iov_base = (void *)pt_dynamic;
         remote[0].iov_len = sizeof (ElfW(Dyn));
@@ -86,7 +90,7 @@ namespace H_rdebug
           break;
         pt_dynamic += sizeof (ElfW(Dyn));
       }
-      if (r_child == 0)
+      if (r_child == 0) // if the r_debug is null we singlestep and loop again 
       {
         ptrace(PTRACE_SINGLESTEP, child, 0, 0);
         waitpid(child, 0, 0);
@@ -99,6 +103,8 @@ namespace H_rdebug
     }
     while (true);
   }
+
+
   
   int auxv_info::init_tracker()
   {

@@ -93,10 +93,10 @@ int main(int argc, char *argv[])
   {
     ptrace(PTRACE_CONT, child, 0, 0);
     waitpid(child, &status, 0);
-    if (WIFEXITED(status))
+    if (WIFEXITED(status) || WTERMSIG(status) == SIGKILL)
     {
       free(tr.r_debug);
-      printf("++++++ exited with %d ++++++\n", WIFEXITED(status));
+      tracker.show_leaks();
       return 0;
     }
     tr.get_r_debug_addr(); /* update r_debug */
@@ -108,7 +108,7 @@ int main(int argc, char *argv[])
         ptrace(PTRACE_GETSIGINFO, child, NULL, &info);
         tracker.is_invalid((uintptr_t)info.si_addr, regs); /* is valid */
       }
-      if (WSTOPSIG(status) == SIGTRAP)
+      else if (WSTOPSIG(status) == SIGTRAP)
       {
         if ((unsigned long )regs.rip - 1 == (unsigned long)tr.r_debug->r_brk)
         {

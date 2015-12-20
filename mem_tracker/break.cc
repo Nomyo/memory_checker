@@ -91,13 +91,13 @@ void Tracker::init_break() /* add break of elf child file*/
   if (file == -1)
   {
     std::cerr << "Couldn't open " << binary_ << " file" << std::endl;
-    return;
+    exit(2);
   }
   struct stat s;
   if (fstat(file, &s) == -1)
   {
     std::cerr << "Couldn't open " << binary_ << " file" << std::endl;
-    return;;
+    exit(2);
   }
   elf = (ElfW(Ehdr) *)mmap(0, s.st_size, PROT_READ, MAP_SHARED, file, 0); /* mapp the lib */
   get_shdr(elf, addr, binary_);

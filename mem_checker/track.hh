@@ -14,11 +14,12 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <capstone/capstone.h>
-#include "syscall_p.hh"
 #include <sys/wait.h>
 #include "alloc_obj.hh"
 #include <list>
 #include <asm/unistd.h>
+#include <sys/reg.h>
+#include <sys/user.h>
 
 class Tracker
 {
@@ -71,6 +72,7 @@ public:
   void print_ls_mem();
   void get_current_inst(uintptr_t addr);
   void show_leaks();
+
 private:
   std::map<std::string, std::map<uintptr_t, unsigned long>> mbreak_;
   pid_t pid_;
@@ -80,6 +82,8 @@ private:
   uintptr_t brk_ = 0;
   unsigned long brk_len_ = 0;
   unsigned long mem_alloc_ = 0;
+  unsigned long nb_free_;
+  unsigned long nb_alloc_;
 };
 
 #endif /* !BREAK_HH */
