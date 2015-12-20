@@ -91,7 +91,7 @@ void Tracker::wrap_mprotect(struct user_regs_struct regs)
     return;
   }
   for (auto i = ls_mem_.begin(); i != ls_mem_.end(); ++i)
-  { 
+  {
     if (addr_e >= i->addr + i->len && i->addr + i->len >= addr_b
         && addr_e >= i->addr && i->addr >= addr_b)
     {
@@ -232,7 +232,7 @@ void Tracker::wrap_brk(struct user_regs_struct regs)
     {
       printf("brk { addr = 0x%lx, len = 0x%lx, prot = 0 }\n",
              brk_, brk_len_);
-      brk_len_ = brk_len_ + regs.rdi - brk_; 
+      brk_len_ = brk_len_ + regs.rdi - brk_;
       printf("\tto { addr = 0x%lx, len = 0x%lx, prot = 0 }\n",
              brk_, brk_len_);
     }
@@ -240,7 +240,7 @@ void Tracker::wrap_brk(struct user_regs_struct regs)
     {
       printf("brk { addr = 0x%lx, len = (nil), prot = 0 }\n",
              brk_);
-      brk_len_ = brk_len_ + regs.rdi - brk_; 
+      brk_len_ = brk_len_ + regs.rdi - brk_;
       printf("\tto { addr = 0x%lx, len = 0x%lx, prot = 0 }\n",
              brk_, brk_len_);
     }
@@ -255,14 +255,14 @@ void Tracker::wrap_malloc_b(struct user_regs_struct regs)
   s.prot = -1;
   printf("malloc { addr = 0x%lx, len = 0x%lx }\n"
          , s.addr, s.len);
-  ls_mem_.push_back(s);  
+  ls_mem_.push_back(s);
 }
 
 void Tracker::wrap_realloc_b(struct user_regs_struct regs)
 {
   if (regs.r12 == 0) /* ptr is NULL so act like malloc */
   {
-    struct S_mem s;  /* right before libc malloc call so we do */ 
+    struct S_mem s;  /* right before libc malloc call so we do */
     s.addr = regs.r9;      /* not have the return address yet*/
     s.len = regs.r11;
     s.prot = -1;
@@ -281,7 +281,7 @@ void Tracker::wrap_realloc_b(struct user_regs_struct regs)
         ls_mem_.erase(i);
         return;
       }
-    }    
+    }
   }
   else
   {
@@ -309,7 +309,7 @@ void Tracker::wrap_calloc_b(struct user_regs_struct regs)
   s.prot = -1;
   printf("calloc { addr = 0x%lx, len = 0x%lx }\n"
          , s.addr, s.len);
-  ls_mem_.push_back(s);  
+  ls_mem_.push_back(s);
 }
 
 void Tracker::wrap_free(struct user_regs_struct regs)

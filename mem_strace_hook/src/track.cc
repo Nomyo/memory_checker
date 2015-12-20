@@ -44,7 +44,7 @@ namespace Track
       std::cerr << "No program header found \n";
     file.close();
   }
-  
+
   void tracker::get_r_debug_addr()
   {
     struct r_debug *r_child;
@@ -99,7 +99,7 @@ namespace Track
     }
     while (true);
   }
-  
+
   int tracker::init_tracker()
   {
     get_phdr();

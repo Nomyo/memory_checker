@@ -17,6 +17,11 @@ all: $(SRC) $(LIB)
 $(LIB): $(LSRC)
 	$(CC) $(CLIBFLAGS) $(CFLAGS) -o $@ $^
 
+check: all
+	gcc tests/test.c -o test
+	./mem_checker --preload ./myliballoc.so ./test
+
 clean:
 	$(RM) mem_checker
 	$(RM) $(LIB)
+	$(RM) test

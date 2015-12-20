@@ -36,7 +36,7 @@ int Break::get_state()
 
 
 // update_break disas the memory area, look for syscall instruction
-// and add the address into breakpoint map with the associated name 
+// and add the address into breakpoint map with the associated name
 
 void Break::update_break(ElfW(Addr) l_addr, ElfW(Off) off,
                          ElfW(Xword) size, char *l_name)
@@ -199,7 +199,7 @@ void Break::add_break(uintptr_t addr, std::string l_name)
 
 
 // Delete in map structure the map corresponding to
-// a deleted load object      
+// a deleted load object
 
 void Break::rem_loadobj(struct link_map *l_map)
 {
@@ -215,7 +215,7 @@ void Break::rem_loadobj(struct link_map *l_map)
       Tools::get_load_obj_next(pid_, l_map);
     }
     if (!l_map && i.first.compare(binary_) != 0)
-    { 
+    {
       mbreak_.erase(i.first);
       break;
     }
@@ -226,7 +226,7 @@ void Break::rem_loadobj(struct link_map *l_map)
 
 
 // function called when SIGTRAP is caught and rip - 1 is not equal
-// to r_brk                 
+// to r_brk
 
 int Break::treat_break(struct link_map *l_map, uintptr_t addr,
                        struct user_regs_struct regs)

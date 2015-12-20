@@ -33,6 +33,7 @@ void free(void *addr)
 {
   __asm__ __volatile__("push %r10");
   __asm__ __volatile__("mov $0xc01db3afffffffff, %r10\n");
+  __asm__ __volatile__("mov %0, %%r11;" : : "r" (addr));
   __asm__ __volatile__("int3");
   __asm__ __volatile__("pop %r10");
   __asm__ __volatile__("mov $0x0, %r10\n");

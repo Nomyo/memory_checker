@@ -297,7 +297,7 @@ int Tracker::rem_break(uintptr_t addr, char *l_name, struct user_regs_struct reg
           {
             /* wrapper mmap and associated func */
             if (regs.orig_rax == __NR_mmap || regs.orig_rax == __NR_mremap
-                || regs.orig_rax == __NR_munmap
+                || regs.orig_rax == __NR_munmap || regs.orig_rax == __NR_brk
                 || regs.orig_rax == __NR_mprotect)
               wrap_alloc_syscall(regs.orig_rax, regs);
           }

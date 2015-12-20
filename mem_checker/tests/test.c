@@ -7,16 +7,14 @@
 
 int main()
 {
-  char *addr = (char *)mmap(NULL, 4096, PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);  
-  addr[4092] = 51;
-  void *addr = malloc(1420);
+  void *addrp = malloc(1420);
   void *addre = malloc(9999);
   free(addre);
   addre = realloc(NULL, 1000);
-  realloc(addre, 0);
+  addre = realloc(addre, 0);
   void *callocptr = calloc(10, 100);
   free(callocptr);
-  free(addr);
+  free(addre + 615);
   char *ptr = (char *)mmap(NULL, 4096, PROT_READ | PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
   mprotect(ptr, 102, PROT_NONE);
   return 0;

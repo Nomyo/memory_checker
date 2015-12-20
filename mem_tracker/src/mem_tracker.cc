@@ -85,7 +85,7 @@ int main(int argc, char *argv[])
   waitpid(child, &status, 0);
   ptrace(PTRACE_SETOPTIONS, child, 0, PTRACE_O_TRACESYSGOOD);
   tr.child = child;
-  tr.init_tracker(); 
+  tr.init_tracker();
 
   /* From here r_debug is set */
 

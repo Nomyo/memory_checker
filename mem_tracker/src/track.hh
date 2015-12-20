@@ -27,7 +27,7 @@ public:
   Tracker();
   Tracker(pid_t pid, int state, char *name);
   ~Tracker();
-  
+
   void print_breaks();
   int get_state();
   void set_state(int state);
@@ -50,7 +50,7 @@ public:
 
   void wrap_alloc_syscall(unsigned long sysnum, struct user_regs_struct regs);
   int check_reg(struct user_regs_struct regs);
-  
+
   /* wrapper that analyse pid_ registers, print and fill ls_mem_ struct */
   void wrap_mmap(struct user_regs_struct regs);
   void wrap_mprotect(struct user_regs_struct regs);
@@ -61,7 +61,7 @@ public:
   void wrap_malloc_b(struct user_regs_struct regs);
   void wrap_realloc_b(struct user_regs_struct regs);
   void wrap_calloc_b(struct user_regs_struct regs);
-    
+
   void print_ls_mem();
 
 private:

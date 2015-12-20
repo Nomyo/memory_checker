@@ -44,7 +44,7 @@ namespace H_rdebug
       std::cerr << "No program header found \n";
     file.close();
   }
-  
+
   void auxv_info::get_r_debug_addr()
   {
     struct r_debug *r_child;
@@ -99,7 +99,7 @@ namespace H_rdebug
     }
     while (true);
   }
-  
+
   int auxv_info::init_tracker()
   {
     get_phdr();

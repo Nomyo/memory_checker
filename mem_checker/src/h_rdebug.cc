@@ -13,8 +13,8 @@
 
 namespace H_rdebug
 {
- 
-  // get programm header from the proc/pid/auxv 
+
+  // get programm header from the proc/pid/auxv
   void auxv_info::get_phdr()
   {
     std::ifstream file;
@@ -46,7 +46,7 @@ namespace H_rdebug
       std::cerr << "No program header found \n";
     file.close();
   }
-  
+
 
   // get the r_debug and store it
   void auxv_info::get_r_debug_addr()
@@ -90,7 +90,7 @@ namespace H_rdebug
           break;
         pt_dynamic += sizeof (ElfW(Dyn));
       }
-      if (r_child == 0) // if the r_debug is null we singlestep and loop again 
+      if (r_child == 0) // if the r_debug is null we singlestep and loop again
       {
         ptrace(PTRACE_SINGLESTEP, child, 0, 0);
         waitpid(child, 0, 0);
@@ -105,7 +105,7 @@ namespace H_rdebug
   }
 
 
-  
+
   int auxv_info::init_tracker()
   {
     get_phdr();

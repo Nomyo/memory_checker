@@ -123,12 +123,12 @@ void Tracker::load_lo(struct link_map *l_map)
   char name[512];
   ElfW(Ehdr) *elf;
   l_map = Tools::get_load_obj_next(pid_, l_map); // Bypass first l_map
-  while (l_map)  
+  while (l_map)
   {
     Tools::get_load_obj_name(pid_, l_map, name);
     struct link_map m;
     Tools::read_from_pid(pid_, sizeof (struct link_map), &m, l_map);
-    if (strcmp("", name) == 0 || strcmp("linux-vdso.so.1", name) == 0) /* to fix ? */
+    if (strcmp("", name) == 0 || strncmp("linux-vdso.so", name, 13) == 0)
     {
       l_map = Tools::get_load_obj_next(pid_, l_map);
       continue;
@@ -201,7 +201,7 @@ void Tracker::rem_loadobj(struct link_map *l_map)
       l_map = Tools::get_load_obj_next(pid_, l_map);
     }
     if (!l_map && i.first.compare(binary_) != 0)
-    { 
+    {
       mbreak_.erase(i.first);
       break;
     }
@@ -257,7 +257,7 @@ int Tracker::rem_break(uintptr_t addr, char *l_name, struct user_regs_struct reg
             if (regs.orig_rax == __NR_mmap || regs.orig_rax == __NR_mremap
               || regs.orig_rax == __NR_munmap || regs.orig_rax == __NR_mprotect
               || regs.orig_rax == __NR_brk)
-              wrap_alloc_syscall(regs.orig_rax, regs);              
+              wrap_alloc_syscall(regs.orig_rax, regs);
           }
           ptrace(PTRACE_POKEDATA, pid_, addr,
                  (ins & 0xffffffffffffff00) | 0xcc);

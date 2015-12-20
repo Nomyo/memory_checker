@@ -37,13 +37,13 @@ void Tracker::wrap_munmap(struct user_regs_struct regs)
       i->addr = addr_e;
       mem_alloc_ -= i->len;
       i->len = i->addr + i->len - addr_e;
-      mem_alloc_ += i->len; 
+      mem_alloc_ += i->len;
         }
     else if (addr_e >= i->addr + i->len && i->addr + i->len >= addr_b && i->addr < addr_b)
     {
       mem_alloc_ -= i->len;
       i->len = i->addr + i->len - addr_b;
-      mem_alloc_ += i->len; 
+      mem_alloc_ += i->len;
     }
     else if (i->addr + i->len > addr_e && i->addr < addr_e && addr_b > i->addr) /* split */
     {
@@ -72,7 +72,7 @@ void Tracker::wrap_mprotect(struct user_regs_struct regs)
   if (-regs.rax == ENOMEM) /* if -ENOMEM mprotect failed */
     return;
   for (auto i = ls_mem_.begin(); i != ls_mem_.end(); ++i)
-  { 
+  {
     if (addr_e >= i->addr + i->len && i->addr + i->len >= addr_b
         && addr_e >= i->addr && i->addr >= addr_b)
     {
@@ -158,8 +158,8 @@ void Tracker::wrap_malloc_b(struct user_regs_struct regs)
   struct S_mem s;
   s.addr = regs.r12;
   s.len = regs.r11;
-  s.prot = -1;
-  ls_mem_.push_back(s);  
+  s.prot = 3;
+  ls_mem_.push_back(s);
   nb_alloc_++;
 }
 
@@ -167,10 +167,10 @@ void Tracker::wrap_realloc_b(struct user_regs_struct regs)
 {
   if (regs.r12 == 0) /* ptr is NULL so act like malloc */
   {
-    struct S_mem s;  /* right before libc malloc call so we do */ 
+    struct S_mem s;  /* right before libc malloc call so we do */
     s.addr = regs.r9;      /* not have the return address yet*/
     s.len = regs.r11;
-    s.prot = -1;
+    s.prot = 3;
     ls_mem_.push_back(s);
     nb_alloc_++;
   }
@@ -180,10 +180,11 @@ void Tracker::wrap_realloc_b(struct user_regs_struct regs)
     {
       if (i->addr == regs.r12)
       {
+        nb_free_++;
         ls_mem_.erase(i);
         return;
       }
-    }    
+    }
   }
   else
   {
@@ -191,7 +192,7 @@ void Tracker::wrap_realloc_b(struct user_regs_struct regs)
     {
       if (i->addr == regs.r12)
       {
-        i->prot = -1; /* unset the struct in order to tell at the end of realloc */
+        i->prot = 3; /* unset the struct in order to tell at the end of realloc */
         i->addr = regs.r9;
         i->len = regs.r11;
       }
@@ -204,7 +205,7 @@ void Tracker::wrap_calloc_b(struct user_regs_struct regs)
   struct S_mem s;
   s.addr = regs.r9;
   s.len = regs.r11 * regs.r12;
-  s.prot = -1;
+  s.prot = 3;
   ls_mem_.push_back(s);
   nb_alloc_++;
 }
@@ -213,14 +214,27 @@ void Tracker::wrap_free(struct user_regs_struct regs)
 {
   for (auto i = ls_mem_.begin(); i != ls_mem_.end(); ++i)
   {
-    if (i->addr == regs.rdi)
+    if (i->addr == (uintptr_t)regs.r11)
     {
       ls_mem_.erase(i);
       nb_free_++;
       return;
     }
   }
-  printf("\x1b[31m Invalid free at : 0x%llx\x1b[0m\n", regs.rdi);
+  printf("\x1b[31mInvalid free at : 0x%lx\x1b[0m\n", (uintptr_t)regs.r11);
+}
+
+void Tracker::wrap_brk(struct user_regs_struct regs)
+{
+  if (brk_ == 0)
+    brk_ = (uintptr_t)regs.rax;
+  else
+  {
+    if (brk_len_)
+      brk_len_ = brk_len_ + regs.rdi - brk_;
+    else
+      brk_len_ = brk_len_ + regs.rdi - brk_;
+  }
 }
 
 int Tracker::check_reg(struct user_regs_struct regs)
@@ -259,4 +273,6 @@ void Tracker::wrap_alloc_syscall(unsigned long sysnum,
     wrap_mremap(regs);
   else if (sysnum == __NR_mprotect)
     wrap_mprotect(regs);
+  else if (sysnum == __NR_brk)
+    wrap_brk(regs);
 }

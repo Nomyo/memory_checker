@@ -12,7 +12,7 @@ void Tracker::un_protect(struct S_mem map, struct user_regs_struct regs)
   else
     regs.rdx = PROT_NONE;
   unsigned long ins = ptrace(PTRACE_PEEKDATA, pid_, regs.rip); /* save old instruction */
-  
+
   ptrace(PTRACE_POKEDATA, pid_, regs.rip, (ins & 0xffffffffffff0000) | 0x050f);
   ptrace(PTRACE_SETREGS, pid_, NULL, &regs);  /* poke syscall ins */
   ptrace(PTRACE_SINGLESTEP, pid_, 0, 0);
@@ -47,6 +47,7 @@ void Tracker::un_protect_all(struct user_regs_struct regs)
   }
 }
 
+
 void Tracker::re_all_protect(struct user_regs_struct regs)
 {
   for (auto i = ls_mem_.begin(); i != ls_mem_.end(); ++i)
@@ -72,13 +73,13 @@ void Tracker::get_current_inst(uintptr_t addr)
   if (count)
     printf("0x%lx :\t%s\t%s\n", addr, insn[0].mnemonic,
            insn[0].op_str);
-  
+
   cs_close(&handle);
 }
 
 void Tracker::show_leaks()
 {
-  
+
   printf("\n\n\x1b[31mMemory leaks\x1b[0m : %ld bytes not liberated at exit\n",
          mem_alloc_);
   for (auto &i : ls_mem_)
@@ -106,11 +107,10 @@ void Tracker::is_invalid(uintptr_t addr, struct user_regs_struct regs)
       un_protect(*i, regs);
       if (WIFSTOPPED(status) && WSTOPSIG(status) == SIGSEGV)
       {
-        printf("\nInvalid memory access at address : 0x%lx\n", addr);
+        printf("\n\x1b[33mInvalid memory access at address\x1b[0m : 0x%lx\n", addr);
         get_current_inst(o_add);
-        /* kill instead of exit in order to let the father free the memory */ 
+        /* kill instead of exit in order to let the father free the memory */
         kill(pid_, SIGKILL);
-
       }
       return;
     }

@@ -24,7 +24,7 @@ public:
   Break();
   Break(pid_t pid, int state, char *name); //typename r_debug::r_state state);
   ~Break();
-  
+
   void update_break(ElfW(Addr) l_addr, ElfW(Off) off,
                     ElfW(Xword) size, char *l_name);
   void get_shdr(ElfW(Ehdr) *elf_addr, ElfW(Addr) l_addr, char *name);
@@ -42,7 +42,7 @@ public:
   void print_lib_name(struct link_map *l_map);
   void rem_loadobj(struct link_map *l_map);
   void init_break();
-  
+
 private:
   std::map<std::string, std::map<uintptr_t, unsigned long>> mbreak_;
   pid_t pid_;
