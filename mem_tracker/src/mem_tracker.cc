@@ -36,6 +36,9 @@ void parsing_cmd_line(int argc, char **argv[], bool *b)
   }
 }
 
+
+
+
 int in_child(char *argv[], bool load_lib, char *lib)
 {
   ptrace(PTRACE_TRACEME, 0, 0, 0);
@@ -51,6 +54,9 @@ int in_child(char *argv[], bool load_lib, char *lib)
     return execvp(argv[0], argv);
   }
 }
+
+
+
 
 int main(int argc, char *argv[])
 {

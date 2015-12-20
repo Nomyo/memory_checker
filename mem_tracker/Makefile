@@ -6,8 +6,9 @@ CFLAGS=-std=c99 -Wall -Werror -Wextra -g -fPIC -ldl
 
 CLIBFLAGS= -shared
 
-SRC = mem_tracker.cc h_rdebug.cc break.cc tools.cc syscall_p.cc m_trace.cc
-LSRC = myliballoc.c
+SRC = src/mem_tracker.cc src/h_rdebug.cc src/break.cc src/tools.cc \
+			src/syscall_p.cc src/m_trace.cc
+LSRC = src/myliballoc.c
 LIB = myliballoc.so
 
 all: $(SRC) $(LIB)
@@ -16,6 +17,11 @@ all: $(SRC) $(LIB)
 $(LIB): $(LSRC)
 	$(CC) $(CLIBFLAGS) $(CFLAGS) -o $@ $^
 
+check: all
+	gcc ./tests/test.c -o test
+	./mem_tracker --preload ./myliballoc.so ./test
+
 clean:
-	rm -f mem_tracker
-	rm -f $(LIB)
+	$(RM) mem_tracker
+	$(RM) $(LIB)
+	$(RM) test

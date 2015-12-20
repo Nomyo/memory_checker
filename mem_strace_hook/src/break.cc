@@ -1,44 +1,44 @@
-#include "track.hh"
+#include "break.hh"
+#include <errno.h>
 
-Tracker::Tracker()
+Break::Break()
   : mbreak_()
 {}
 
-Tracker::Tracker(pid_t pid, int state, char *name)
+Break::Break(pid_t pid, int state, char *name)
   : mbreak_()
   , pid_(pid)
   , p_state_(state)
   , binary_(name)
-  , ls_mem_()
 {}
 
-void Tracker::set_pid(pid_t pid)
+void Break::set_pid(pid_t pid)
 {
   pid_ = pid;
 }
 
-pid_t Tracker::get_pid()
+pid_t Break::get_pid()
 {
   return pid_;
 }
 
-Tracker::~Tracker() = default;
+Break::~Break() = default;
 
-void Tracker::set_state(int state)
+void Break::set_state(int state)
 {
   p_state_ = state;
 }
 
-int Tracker::get_state()
+int Break::get_state()
 {
   return p_state_;
 }
 
 
 // update_break disas the memory area, look for syscall instruction
-// and add the address into breakpoint map with the associated name
+// and add the address into breakpoint map with the associated name 
 
-void Tracker::update_break(ElfW(Addr) l_addr, ElfW(Off) off,
+void Break::update_break(ElfW(Addr) l_addr, ElfW(Off) off,
                          ElfW(Xword) size, char *l_name)
 {
   csh handle;
@@ -70,12 +70,9 @@ void Tracker::update_break(ElfW(Addr) l_addr, ElfW(Off) off,
 }
 
 
-
-
-
 // get_shdr from the ELF header and call the update break function
 
-void Tracker::get_shdr(ElfW(Ehdr) *ehdr, ElfW(Addr) l_addr, char *l_name)
+void Break::get_shdr(ElfW(Ehdr) *ehdr, ElfW(Addr) l_addr, char *l_name)
 {
   int shnum = ehdr->e_shnum; /* get number of section */
   if (ehdr->e_shstrndx == SHN_UNDEF)
@@ -96,12 +93,10 @@ void Tracker::get_shdr(ElfW(Ehdr) *ehdr, ElfW(Addr) l_addr, char *l_name)
 }
 
 
-
-
 // init_break is called at the beginning of the program
 // and register breakpoint in the file which name is im binary_
 
-void Tracker::init_break()
+void Break::init_break() /* add break of elf child file*/
 {
   ElfW(Ehdr) *elf;
   ElfW(Addr) addr = 0x400000;
@@ -109,27 +104,25 @@ void Tracker::init_break()
   if (file == -1)
   {
     std::cerr << "Couldn't open " << binary_ << " file" << std::endl;
-    exit(2); // Nothing allocated so exit here won't leads to leak
+    return;
   }
   struct stat s;
   if (fstat(file, &s) == -1)
   {
     std::cerr << "Couldn't open " << binary_ << " file" << std::endl;
-    exit(2);
+    return;;
   }
-  elf = (ElfW(Ehdr) *)mmap(0, s.st_size, PROT_READ, MAP_SHARED, file, 0);
+  elf = (ElfW(Ehdr) *)mmap(0, s.st_size, PROT_READ, MAP_SHARED, file, 0); /* mapp the lib */
   get_shdr(elf, addr, binary_);
   munmap(elf, s.st_size);
 }
 
 
 
-
-
 // load_lo will temporary map load object in order to get the ELF header
-// and then 
 
-void Tracker::load_lo(struct link_map *l_map)
+
+void Break::load_lo(struct link_map *l_map)
 {
   char name[512];
   ElfW(Ehdr) *elf;
@@ -139,11 +132,11 @@ void Tracker::load_lo(struct link_map *l_map)
     Tools::get_load_obj_name(pid_, l_map, name);
     struct link_map m;
     Tools::read_from_pid(pid_, sizeof (struct link_map), &m, l_map);
-    if (strcmp("", name) == 0 || strncmp("linux-vdso.so", name, 13) == 0)
+    if (strcmp("", name) == 0 || strcmp("linux-vdso.so.1", name) == 0) /* to fix ? */
     {
       l_map = Tools::get_load_obj_next(pid_, l_map);
       continue;
-    }
+      }
     else
     {
       int file = open(name, O_RDONLY);
@@ -158,7 +151,7 @@ void Tracker::load_lo(struct link_map *l_map)
         std::cerr << "Couldn't open " << name << " file" << std::endl;
         break;
       }
-      elf = (ElfW(Ehdr) *)mmap(0, s.st_size, PROT_READ, MAP_SHARED, file, 0);
+      elf = (ElfW(Ehdr) *)mmap(0, s.st_size, PROT_READ, MAP_SHARED, file, 0); /* mapp the lib */
       get_shdr(elf, m.l_addr, name);
       munmap(elf, s.st_size);
     }
@@ -167,13 +160,10 @@ void Tracker::load_lo(struct link_map *l_map)
 }
 
 
-
-
-
 // Update function is called when r_debug state is consistent so
 // we look at the previous state ADD or DELETE to do the right call
 
-void Tracker::update(struct link_map *l_map)
+void Break::update(struct link_map *l_map)
 {
   if (p_state_ == r_debug::RT_ADD)
     load_lo(l_map);
@@ -182,20 +172,16 @@ void Tracker::update(struct link_map *l_map)
 }
 
 
-
-
 // add breakpoint in the map corresponding to l_name
 
-void Tracker::add_break(uintptr_t addr, std::string l_name)
+void Break::add_break(uintptr_t addr, std::string l_name)
 {
   if (mbreak_.find(l_name) == mbreak_.end()) /* unpatch loaded objects*/
   {
     mbreak_.insert(pair_name_map(l_name, std::map<uintptr_t, unsigned long>{}));
-    unsigned long ins = ptrace(PTRACE_PEEKDATA, pid_, addr);
-
-    // save old instruction and store a breakpoint isntruction
-    mbreak_[l_name].insert(std::pair<uintptr_t, unsigned long>(addr, ins));
-    ptrace(PTRACE_POKEDATA, pid_, addr, (ins & 0xffffffffffffff00) | 0xcc);
+    unsigned long ins = ptrace(PTRACE_PEEKDATA, pid_, addr); /* get instruction */
+    mbreak_[l_name].insert(std::pair<uintptr_t, unsigned long>(addr, ins)); /* store old ins */
+    ptrace(PTRACE_POKEDATA, pid_, addr, (ins & 0xffffffffffffff00) | 0xcc); /*ins break point*/
   }
   else
   {
@@ -212,28 +198,24 @@ void Tracker::add_break(uintptr_t addr, std::string l_name)
 }
 
 
-
-
-
 // Delete in map structure the map corresponding to
-// a deleted load object
+// a deleted load object      
 
-void Tracker::rem_loadobj(struct link_map *l_map)
+void Break::rem_loadobj(struct link_map *l_map)
 {
   struct link_map *head = l_map;
   char name[512];
   for (auto const &i : mbreak_)
   {
-    l_map = Tools::get_load_obj_next(pid_, l_map);
     while (l_map)
     {
       Tools::get_load_obj_name(pid_, l_map, name);
       if (i.first.compare(name) == 0)
         break;
-      l_map = Tools::get_load_obj_next(pid_, l_map);
+      Tools::get_load_obj_next(pid_, l_map);
     }
     if (!l_map && i.first.compare(binary_) != 0)
-    {
+    { 
       mbreak_.erase(i.first);
       break;
     }
@@ -243,12 +225,10 @@ void Tracker::rem_loadobj(struct link_map *l_map)
 }
 
 
-
-
 // function called when SIGTRAP is caught and rip - 1 is not equal
-// to r_brk
+// to r_brk                 
 
-int Tracker::treat_break(struct link_map *l_map, uintptr_t addr,
+int Break::treat_break(struct link_map *l_map, uintptr_t addr,
                        struct user_regs_struct regs)
 {
   char name[512];
@@ -257,52 +237,49 @@ int Tracker::treat_break(struct link_map *l_map, uintptr_t addr,
   {
     Tools::get_load_obj_name(pid_, l_map, name);
     if (rem_break(addr, name, regs) == 1)
-    return 1;
+      return 1;
     l_map = Tools::get_load_obj_next(pid_, l_map);
   }
   return 0;
 }
 
-
 // function that from a breakpoint and regs, process the syscall and
 // a wrapper is called if necessary
 
-int Tracker::rem_break(uintptr_t addr, char *l_name, struct user_regs_struct regs)
+int Break::rem_break(uintptr_t addr, char *l_name, struct user_regs_struct regs)
 {
   for (auto const &i : mbreak_)
   {
-    if (i.first.compare(l_name) == 0
-        && (i.second.find(addr) != i.second.end()))
+    if (i.first.compare(l_name) == 0)
     {
-      for (auto const &j : i.second)
+      if (i.second.find(addr) != i.second.end())
       {
-        if (j.first == addr)
+        for (auto const &j : i.second)
         {
-          int status;
-          unsigned long ins = j.second;
-          ptrace(PTRACE_POKEDATA, pid_, addr, ins); /* syscall instr set */
-          regs.rip--;
-          ptrace(PTRACE_SETREGS, pid_, NULL, &regs);
-          re_all_protect(regs); /* remove all protection */
-          ptrace(PTRACE_SINGLESTEP, pid_, 0, 0); /* exec syscall */
-          waitpid(pid_, &status, 0);
-          ptrace(PTRACE_GETREGS, pid_, NULL, &regs);
-          un_protect_all(regs); /* reset all protection */
-          if (WIFEXITED(status))
+          if (j.first == addr)
           {
-            show_leaks();
-            return 1;
+            int status;
+            unsigned long ins = j.second;
+            ptrace(PTRACE_POKEDATA, pid_, addr, ins);
+            regs.rip--;
+            ptrace(PTRACE_SETREGS, pid_, NULL, &regs);
+            ptrace(PTRACE_SINGLESTEP, pid_, 0, 0);
+            waitpid(pid_, &status, 0);
+            if (WIFEXITED(status))
+            {
+              ptrace(PTRACE_GETREGS, pid_, NULL, &regs);
+              p_sys_exit(regs.rax, WEXITSTATUS(status), pid_);
+              printf("++++++ exited with %d ++++++\n", WEXITSTATUS(status));
+              return 1;
+            }
+            else
+            {
+              ptrace(PTRACE_GETREGS, pid_, NULL, &regs);
+              p_syscall(regs.orig_rax, regs, pid_);
+            }
+            ptrace(PTRACE_POKEDATA, pid_, addr,
+                   (ins & 0xffffffffffffff00) | 0xcc);
           }
-          else
-          {
-            /* wrapper mmap and associated func */
-            if (regs.orig_rax == __NR_mmap || regs.orig_rax == __NR_mremap
-                || regs.orig_rax == __NR_munmap
-                || regs.orig_rax == __NR_mprotect)
-              wrap_alloc_syscall(regs.orig_rax, regs);
-          }
-          ptrace(PTRACE_POKEDATA, pid_, addr,
-                 (ins & 0xffffffffffffff00) | 0xcc);
         }
       }
     }
@@ -310,9 +287,7 @@ int Tracker::rem_break(uintptr_t addr, char *l_name, struct user_regs_struct reg
   return 0;
 }
 
-
-
-void Tracker::print_lib_name(struct link_map *l_map)
+void Break::print_lib_name(struct link_map *l_map)
 {
   char name[512];
   l_map = Tools::get_load_obj_next(pid_, l_map);
@@ -324,8 +299,7 @@ void Tracker::print_lib_name(struct link_map *l_map)
   }
 }
 
-
-void Tracker::print_breaks()
+void Break::print_breaks()
 {
   for (auto const &i : mbreak_)
   {

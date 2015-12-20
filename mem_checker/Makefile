@@ -6,8 +6,9 @@ CFLAGS=-std=c99 -Wall -Werror -Wextra -g -fPIC -ldl
 
 CLIBFLAGS= -shared
 
-SRC = mem_checker.cc h_rdebug.cc break.cc tools.cc m_trace.cc m_access.cc
-LSRC = myliballoc.c
+SRC = src/mem_checker.cc src/h_rdebug.cc src/break.cc src/tools.cc \
+			src/m_trace.cc src/m_access.cc
+LSRC = src/myliballoc.c
 LIB = myliballoc.so
 
 all: $(SRC) $(LIB)

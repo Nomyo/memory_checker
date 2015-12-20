@@ -34,6 +34,10 @@ int Tracker::get_state()
   return p_state_;
 }
 
+
+// update_break disas the memory area, look for syscall instruction
+// and add the address into breakpoint map with the associated name
+
 void Tracker::update_break(ElfW(Addr) l_addr, ElfW(Off) off,
                          ElfW(Xword) size, char *l_name)
 {
@@ -63,6 +67,9 @@ void Tracker::update_break(ElfW(Addr) l_addr, ElfW(Off) off,
   cs_close(&handle);
 }
 
+
+
+// get_shdr from the ELF header and call the update break function
 void Tracker::get_shdr(ElfW(Ehdr) *ehdr, ElfW(Addr) l_addr, char *l_name)
 {
   int shnum = ehdr->e_shnum; /* get number of section */
@@ -82,6 +89,10 @@ void Tracker::get_shdr(ElfW(Ehdr) *ehdr, ElfW(Addr) l_addr, char *l_name)
       update_break(l_addr, shdr_ad->sh_offset, shdr_ad->sh_size, l_name);
   }
 }
+
+
+// init_break is called at the beginning of the program
+// and register breakpoint in the file which name is im binary_
 
 void Tracker::init_break() /* add break of elf child file*/
 {
@@ -103,6 +114,9 @@ void Tracker::init_break() /* add break of elf child file*/
   get_shdr(elf, addr, binary_);
   munmap(elf, s.st_size);
 }
+
+// load_lo will temporary map load object in order to get the ELF header
+// and then call get_shdr
 
 void Tracker::load_lo(struct link_map *l_map)
 {
