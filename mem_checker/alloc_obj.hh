@@ -3,10 +3,9 @@
 
 struct S_mem
 {
-  uintptr_t addr;
-  unsigned long len;
-  long int prot; /* for malloc, realloc or calloc this field
-                    will be used to check if struct is set or not yet */
+  uintptr_t addr;    // start adress the memory block
+  unsigned long len; // length of allocate memory
+  long int prot;     // protection 
 };
 
 #endif /* !ALLOC_OBJ_HH */
