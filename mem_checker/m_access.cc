@@ -78,6 +78,7 @@ void Tracker::get_current_inst(uintptr_t addr)
 
 void Tracker::show_leaks()
 {
+  
   printf("\n\n\x1b[31mMemory leaks\x1b[0m : %ld bytes not liberated at exit\n",
          mem_alloc_);
   for (auto &i : ls_mem_)
@@ -85,6 +86,8 @@ void Tracker::show_leaks()
     printf("\t=> \x1b[32maddress\x1b[0m = 0x%lx - \x1b[32mlen\x1b[0m 0x%lx\n",
            i.addr, i.len);
   }
+  printf("\n HEAP SUMMARY:\n total heap usage : %ld allocs, %ld frees\n\n",
+         nb_alloc_, nb_free_);
 }
 
 void Tracker::is_invalid(uintptr_t addr, struct user_regs_struct regs)

@@ -82,8 +82,8 @@ private:
   uintptr_t brk_ = 0;
   unsigned long brk_len_ = 0;
   unsigned long mem_alloc_ = 0;
-  unsigned long nb_free_;
-  unsigned long nb_alloc_;
-};
+  unsigned long nb_free_ = 0;
+  unsigned long nb_alloc_ = 0;
+  };
 
 #endif /* !BREAK_HH */

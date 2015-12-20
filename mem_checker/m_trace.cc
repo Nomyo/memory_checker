@@ -159,9 +159,8 @@ void Tracker::wrap_malloc_b(struct user_regs_struct regs)
   s.addr = regs.r12;
   s.len = regs.r11;
   s.prot = -1;
-  printf("malloc { addr = 0x%lx, len = 0x%lx }\n"
-         , s.addr, s.len);
   ls_mem_.push_back(s);  
+  nb_alloc_++;
 }
 
 void Tracker::wrap_realloc_b(struct user_regs_struct regs)
@@ -172,9 +171,8 @@ void Tracker::wrap_realloc_b(struct user_regs_struct regs)
     s.addr = regs.r9;      /* not have the return address yet*/
     s.len = regs.r11;
     s.prot = -1;
-    printf("realloc { addr = 0x%lx, len = 0x%lx }\n"
-           , s.addr, s.len);
     ls_mem_.push_back(s);
+    nb_alloc_++;
   }
   else if (regs.r11 == 0) /* size is NULL act like free */
   {
@@ -182,8 +180,6 @@ void Tracker::wrap_realloc_b(struct user_regs_struct regs)
     {
       if (i->addr == regs.r12)
       {
-        printf("realloc { addr = 0x%lx, len = 0x%llx }\n"
-               , i->addr, regs.r11);
         ls_mem_.erase(i);
         return;
       }
@@ -196,10 +192,6 @@ void Tracker::wrap_realloc_b(struct user_regs_struct regs)
       if (i->addr == regs.r12)
       {
         i->prot = -1; /* unset the struct in order to tell at the end of realloc */
-        printf("realloc { addr = 0x%lx, len = 0x%lx }\n"
-               , i->addr, i->len);
-        printf("\tto { addr = 0x%llx, len = 0x%llx }\n"
-               , regs.r9, regs.r11);
         i->addr = regs.r9;
         i->len = regs.r11;
       }
@@ -213,9 +205,8 @@ void Tracker::wrap_calloc_b(struct user_regs_struct regs)
   s.addr = regs.r9;
   s.len = regs.r11 * regs.r12;
   s.prot = -1;
-  printf("calloc { addr = 0x%lx, len = 0x%lx }\n"
-         , s.addr, s.len);
-  ls_mem_.push_back(s);  
+  ls_mem_.push_back(s);
+  nb_alloc_++;
 }
 
 void Tracker::wrap_free(struct user_regs_struct regs)
@@ -224,12 +215,12 @@ void Tracker::wrap_free(struct user_regs_struct regs)
   {
     if (i->addr == regs.rdi)
     {
-      printf("free { addr = 0x%lx, len = 0x%lx }\n"
-             , i->addr, i->len);
       ls_mem_.erase(i);
+      nb_free_++;
       return;
     }
   }
+  printf("\x1b[31m Invalid free at : 0x%llx\x1b[0m\n", regs.rdi);
 }
 
 int Tracker::check_reg(struct user_regs_struct regs)
