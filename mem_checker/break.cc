@@ -98,9 +98,6 @@ void Tracker::get_shdr(ElfW(Ehdr) *ehdr, ElfW(Addr) l_addr, char *l_name)
 
 
 
-
-
-
 // init_break is called at the beginning of the program
 // and register breakpoint in the file which name is im binary_
 

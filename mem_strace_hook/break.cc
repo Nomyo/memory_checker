@@ -34,6 +34,10 @@ int Break::get_state()
   return p_state_;
 }
 
+
+// update_break disas the memory area, look for syscall instruction
+// and add the address into breakpoint map with the associated name 
+
 void Break::update_break(ElfW(Addr) l_addr, ElfW(Off) off,
                          ElfW(Xword) size, char *l_name)
 {
@@ -65,6 +69,9 @@ void Break::update_break(ElfW(Addr) l_addr, ElfW(Off) off,
   cs_close(&handle);
 }
 
+
+// get_shdr from the ELF header and call the update break function
+
 void Break::get_shdr(ElfW(Ehdr) *ehdr, ElfW(Addr) l_addr, char *l_name)
 {
   int shnum = ehdr->e_shnum; /* get number of section */
@@ -84,6 +91,10 @@ void Break::get_shdr(ElfW(Ehdr) *ehdr, ElfW(Addr) l_addr, char *l_name)
       update_break(l_addr, shdr_ad->sh_offset, shdr_ad->sh_size, l_name);
   }
 }
+
+
+// init_break is called at the beginning of the program
+// and register breakpoint in the file which name is im binary_
 
 void Break::init_break() /* add break of elf child file*/
 {
@@ -105,6 +116,11 @@ void Break::init_break() /* add break of elf child file*/
   get_shdr(elf, addr, binary_);
   munmap(elf, s.st_size);
 }
+
+
+
+// load_lo will temporary map load object in order to get the ELF header
+// and then 
 
 void Break::load_lo(struct link_map *l_map)
 {
@@ -143,6 +159,10 @@ void Break::load_lo(struct link_map *l_map)
   }
 }
 
+
+// Update function is called when r_debug state is consistent so
+// we look at the previous state ADD or DELETE to do the right call
+
 void Break::update(struct link_map *l_map)
 {
   if (p_state_ == r_debug::RT_ADD)
@@ -150,6 +170,9 @@ void Break::update(struct link_map *l_map)
   else if (p_state_ == r_debug::RT_DELETE)
     rem_loadobj(l_map);
 }
+
+
+// add breakpoint in the map corresponding to l_name
 
 void Break::add_break(uintptr_t addr, std::string l_name)
 {
@@ -174,6 +197,10 @@ void Break::add_break(uintptr_t addr, std::string l_name)
   }
 }
 
+
+// Delete in map structure the map corresponding to
+// a deleted load object      
+
 void Break::rem_loadobj(struct link_map *l_map)
 {
   struct link_map *head = l_map;
@@ -197,6 +224,10 @@ void Break::rem_loadobj(struct link_map *l_map)
   }
 }
 
+
+// function called when SIGTRAP is caught and rip - 1 is not equal
+// to r_brk                 
+
 int Break::treat_break(struct link_map *l_map, uintptr_t addr,
                        struct user_regs_struct regs)
 {
@@ -211,6 +242,9 @@ int Break::treat_break(struct link_map *l_map, uintptr_t addr,
   }
   return 0;
 }
+
+// function that from a breakpoint and regs, process the syscall and
+// a wrapper is called if necessary
 
 int Break::rem_break(uintptr_t addr, char *l_name, struct user_regs_struct regs)
 {
