@@ -6,7 +6,7 @@ CFLAGS=-std=c99 -Wall -Werror -Wextra -g -fPIC -ldl
 
 CLIBFLAGS= -shared
 
-SRC = mem_checker.cc h_rdebug.cc break.cc tools.cc syscall_p.cc m_trace.cc m_access.cc
+SRC = mem_checker.cc h_rdebug.cc break.cc tools.cc m_trace.cc m_access.cc
 LSRC = myliballoc.c
 LIB = myliballoc.so
 
@@ -17,5 +17,5 @@ $(LIB): $(LSRC)
 	$(CC) $(CLIBFLAGS) $(CFLAGS) -o $@ $^
 
 clean:
-	rm -f mem_checker
-	rm -f $(LIB)
+	$(RM) mem_checker
+	$(RM) $(LIB)
